@@ -52,6 +52,13 @@ export function AppShell({
         </div>
         <div className="flex items-center gap-2">
           <Link
+            to="/account"
+            className="flex size-10 items-center justify-center rounded-full bg-secondary ring-1 ring-border"
+            aria-label="حسابي"
+          >
+            <User className="size-4 text-muted-foreground" />
+          </Link>
+          <Link
             to="/notifications"
             className="flex size-10 items-center justify-center rounded-full bg-secondary ring-1 ring-border"
             aria-label="الإشعارات"
@@ -68,11 +75,28 @@ export function AppShell({
         </div>
       </nav>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+        {allowed === false ? (
+          <div className="rounded-xl bg-card p-6 text-center shadow-sm ring-1 ring-border">
+            <h2 className="text-lg font-semibold">غير مصرح لك بالدخول</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              هذه الصفحة متاحة لنوع حساب مختلف عن حسابك الحالي.
+            </p>
+            <Link
+              to={role.data ? homeForRole(role.data) : "/notifications"}
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              العودة للصفحة المسموح بها
+            </Link>
+          </div>
+        ) : (
+          children
+        )}
+      </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-6 py-3">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
@@ -85,6 +109,7 @@ export function AppShell({
           ))}
         </div>
       </nav>
+
     </div>
   );
 }
