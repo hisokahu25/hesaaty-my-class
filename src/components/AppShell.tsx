@@ -1,13 +1,15 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, CreditCard, Home, LogOut, CalendarDays, Users } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Bell, CreditCard, Home, LogOut, CalendarDays, Users, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { canAccess, homeForRole, useMyRole } from "@/lib/roles";
 
 const NAV = [
   { to: "/dashboard", label: "الرئيسية", icon: Home },
   { to: "/students", label: "الطلاب", icon: Users },
   { to: "/groups", label: "الجدول", icon: CalendarDays },
+  { to: "/grades", label: "الدرجات", icon: Bell },
   { to: "/payments", label: "المالية", icon: CreditCard },
 ] as const;
 
@@ -22,6 +24,11 @@ export function AppShell({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const role = useMyRole();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const nav = NAV.filter((item) => (role.data ? canAccess(role.data, item.to) : false));
+  const allowed = role.data ? canAccess(role.data, pathname) : null;
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -32,6 +39,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background pb-24 text-foreground">
+
       <nav className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/80 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl bg-primary">
