@@ -35,7 +35,7 @@ export const ROLE_ROUTES: Record<AppRole, string[]> = {
   student: ["/grades", "/attendance", "/notifications", "/account"],
 };
 
-export function homeForRole(role: AppRole) {
+export function homeForRole(role: AppRole): "/dashboard" | "/grades" {
   return role === "admin" || role === "teacher" ? "/dashboard" : "/grades";
 }
 
