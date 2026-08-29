@@ -1,13 +1,15 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, CreditCard, Home, LogOut, CalendarDays, Users } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Bell, CreditCard, Home, LogOut, CalendarDays, Users, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { canAccess, homeForRole, useMyRole } from "@/lib/roles";
 
 const NAV = [
   { to: "/dashboard", label: "الرئيسية", icon: Home },
   { to: "/students", label: "الطلاب", icon: Users },
   { to: "/groups", label: "الجدول", icon: CalendarDays },
+  { to: "/grades", label: "الدرجات", icon: Bell },
   { to: "/payments", label: "المالية", icon: CreditCard },
 ] as const;
 
@@ -22,6 +24,11 @@ export function AppShell({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const role = useMyRole();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const nav = NAV.filter((item) => (role.data ? canAccess(role.data, item.to) : false));
+  const allowed = role.data ? canAccess(role.data, pathname) : null;
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -32,6 +39,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background pb-24 text-foreground">
+
       <nav className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/80 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl bg-primary">
@@ -43,6 +51,13 @@ export function AppShell({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to="/account"
+            className="flex size-10 items-center justify-center rounded-full bg-secondary ring-1 ring-border"
+            aria-label="حسابي"
+          >
+            <User className="size-4 text-muted-foreground" />
+          </Link>
           <Link
             to="/notifications"
             className="flex size-10 items-center justify-center rounded-full bg-secondary ring-1 ring-border"
@@ -60,11 +75,28 @@ export function AppShell({
         </div>
       </nav>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+        {allowed === false ? (
+          <div className="rounded-xl bg-card p-6 text-center shadow-sm ring-1 ring-border">
+            <h2 className="text-lg font-semibold">غير مصرح لك بالدخول</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              هذه الصفحة متاحة لنوع حساب مختلف عن حسابك الحالي.
+            </p>
+            <Link
+              to={role.data ? homeForRole(role.data) : "/notifications"}
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              العودة للصفحة المسموح بها
+            </Link>
+          </div>
+        ) : (
+          children
+        )}
+      </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-6 py-3">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
@@ -77,6 +109,7 @@ export function AppShell({
           ))}
         </div>
       </nav>
+
     </div>
   );
 }
