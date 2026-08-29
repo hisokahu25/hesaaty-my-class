@@ -18,6 +18,7 @@ export const ROLE_ROUTES: Record<AppRole, string[]> = {
     "/attendance",
     "/grades",
     "/payments",
+    "/stats",
     "/notifications",
     "/account",
   ],
@@ -28,11 +29,12 @@ export const ROLE_ROUTES: Record<AppRole, string[]> = {
     "/attendance",
     "/grades",
     "/payments",
+    "/stats",
     "/notifications",
     "/account",
   ],
-  parent: ["/grades", "/payments", "/attendance", "/notifications", "/account"],
-  student: ["/grades", "/attendance", "/notifications", "/account"],
+  parent: ["/grades", "/payments", "/attendance", "/stats", "/notifications", "/account"],
+  student: ["/grades", "/attendance", "/stats", "/notifications", "/account"],
 };
 
 export function homeForRole(role: AppRole): "/dashboard" | "/grades" {
