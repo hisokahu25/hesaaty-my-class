@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureAccountSetup } from "@/lib/db";
+import { fetchMyRole, homeForRole } from "@/lib/roles";
 import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,10 +36,17 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function goHome() {
+    await ensureAccountSetup();
+    const userRole = await fetchMyRole();
+    navigate({ to: homeForRole(userRole ?? "teacher"), replace: true });
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard", replace: true });
+      if (data.session) void goHome();
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -62,7 +71,7 @@ function AuthPage() {
           toast.success("تم إنشاء الحساب، راجع بريدك لتأكيد التسجيل");
           setMode("signin");
         } else {
-          navigate({ to: "/dashboard", replace: true });
+          await goHome();
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -70,7 +79,7 @@ function AuthPage() {
           password,
         });
         if (error) throw error;
-        navigate({ to: "/dashboard", replace: true });
+        await goHome();
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذّر إتمام العملية");
@@ -88,7 +97,7 @@ function AuthPage() {
       return;
     }
     if (result.redirected) return;
-    navigate({ to: "/dashboard", replace: true });
+    await goHome();
   }
 
   return (
