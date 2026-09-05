@@ -196,6 +196,17 @@ function AuthPage() {
             </Button>
           </form>
 
+          {mode === "signin" ? (
+            <button
+              type="button"
+              onClick={handleForgot}
+              className="mt-3 w-full text-center text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              نسيت كلمة المرور؟
+            </button>
+          ) : null}
+
+
           <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
             أو
