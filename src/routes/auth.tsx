@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureAccountSetup } from "@/lib/db";
 import { fetchMyRole, homeForRole } from "@/lib/roles";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,16 +107,15 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
-
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
-    if (result.error) {
+    if (error) {
       toast.error("تعذّر تسجيل الدخول عبر جوجل");
-      return;
     }
-    if (result.redirected) return;
-    await goHome();
   }
 
   return (
