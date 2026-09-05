@@ -36,9 +36,7 @@ export const Route = createFileRoute("/_authenticated/students")({
 const EMPTY = {
   full_name: "",
   grade: "",
-  school: "",
   parent_phone: "",
-  address: "",
   notes: "",
   group_id: "",
 };
@@ -66,9 +64,7 @@ function StudentsPage() {
     setForm({
       full_name: student.full_name,
       grade: student.grade,
-      school: student.school,
       parent_phone: student.parent_phone,
-      address: student.address,
       notes: student.notes,
       group_id: student.group_id ?? "",
     });
@@ -86,9 +82,7 @@ function StudentsPage() {
       const payload = {
         full_name: form.full_name.trim().slice(0, 100),
         grade: form.grade.trim().slice(0, 60),
-        school: form.school.trim().slice(0, 100),
         parent_phone: form.parent_phone.trim().slice(0, 20),
-        address: form.address.trim().slice(0, 200),
         notes: form.notes.trim().slice(0, 500),
         group_id: form.group_id || null,
       };
@@ -166,7 +160,6 @@ function StudentsPage() {
           <div className="space-y-3">
             <Field label="الاسم" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
             <Field label="الصف" value={form.grade} onChange={(v) => setForm({ ...form, grade: v })} />
-            <Field label="المدرسة" value={form.school} onChange={(v) => setForm({ ...form, school: v })} />
             <Field label="رقم ولي الأمر" value={form.parent_phone} onChange={(v) => setForm({ ...form, parent_phone: v })} />
             {!editingId ? (
               <div className="space-y-2">
@@ -174,7 +167,6 @@ function StudentsPage() {
                 <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="٤ أحرف على الأقل" />
               </div>
             ) : null}
-            <Field label="العنوان" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
             <div className="space-y-2">
               <Label>المجموعة</Label>
               <select
