@@ -693,6 +693,10 @@ export type Database = {
         Returns: boolean
       }
       is_parent_of_student: { Args: { _student_id: string }; Returns: boolean }
+      service_set_student_portal_password: {
+        Args: { _password: string; _student_id: string }
+        Returns: undefined
+      }
       set_student_portal_password: {
         Args: { _password: string; _student_id: string }
         Returns: undefined
