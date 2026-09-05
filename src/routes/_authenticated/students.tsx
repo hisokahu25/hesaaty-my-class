@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchGroups, fetchStudents, initials, type Student } from "@/lib/db";
+import { setStudentPortalPassword } from "@/lib/student-portal.functions";
 
 export const Route = createFileRoute("/_authenticated/students")({
   head: () => ({
@@ -46,6 +48,8 @@ function StudentsPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const [newPassword, setNewPassword] = useState("");
+  const updatePortalPassword = useServerFn(setStudentPortalPassword);
 
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
@@ -53,6 +57,7 @@ function StudentsPage() {
   function openNew() {
     setEditingId(null);
     setForm(EMPTY);
+    setNewPassword("");
     setOpen(true);
   }
 
@@ -67,6 +72,7 @@ function StudentsPage() {
       notes: student.notes,
       group_id: student.group_id ?? "",
     });
+    setNewPassword("");
     setOpen(true);
   }
 
@@ -75,6 +81,8 @@ function StudentsPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!form.full_name.trim()) throw new Error("اسم الطالب مطلوب");
+      if (!editingId && newPassword.length < 4) throw new Error("حدد كلمة مرور من ٤ أحرف على الأقل");
+      if (!editingId && form.parent_phone.replace(/\D/g, "").length < 4) throw new Error("رقم ولي الأمر يجب أن يحتوي على ٤ أرقام على الأقل");
       const payload = {
         full_name: form.full_name.trim().slice(0, 100),
         grade: form.grade.trim().slice(0, 60),
@@ -88,18 +96,34 @@ function StudentsPage() {
         const { error } = await supabase.from("students").update(payload).eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: student, error } = await supabase
           .from("students")
-          .insert({ teacher_id: auth.user.id, ...payload });
+          .insert({ teacher_id: auth.user.id, ...payload })
+          .select("id")
+          .single();
         if (error) throw error;
+        await updatePortalPassword({ data: { studentId: student.id, password: newPassword } });
       }
     },
     onSuccess: () => {
       toast.success(editingId ? "تم تحديث بيانات الطالب" : "تمت إضافة الطالب");
       setForm(EMPTY);
+      setNewPassword("");
       setEditingId(null);
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["students"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingId) throw new Error("اختر طالبًا");
+      await updatePortalPassword({ data: { studentId: editingId, password: newPassword } });
+    },
+    onSuccess: () => {
+      setNewPassword("");
+      toast.success("تم تغيير كلمة مرور بوابة الطالب");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -144,6 +168,12 @@ function StudentsPage() {
             <Field label="الصف" value={form.grade} onChange={(v) => setForm({ ...form, grade: v })} />
             <Field label="المدرسة" value={form.school} onChange={(v) => setForm({ ...form, school: v })} />
             <Field label="رقم ولي الأمر" value={form.parent_phone} onChange={(v) => setForm({ ...form, parent_phone: v })} />
+            {!editingId ? (
+              <div className="space-y-2">
+                <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
+                <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="٤ أحرف على الأقل" />
+              </div>
+            ) : null}
             <Field label="العنوان" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
             <div className="space-y-2">
               <Label>المجموعة</Label>
@@ -176,6 +206,15 @@ function StudentsPage() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </div>
+            {editingId ? (
+              <div className="space-y-2 rounded-lg bg-secondary p-3">
+                <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
+                <div className="flex gap-2">
+                  <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="كلمة مرور جديدة" />
+                  <Button type="button" variant="outline" disabled={newPassword.length < 4 || passwordMutation.isPending} onClick={() => passwordMutation.mutate()}>تغيير</Button>
+                </div>
+              </div>
+            ) : null}
             <Button
               className="w-full"
               disabled={saveStudent.isPending}
@@ -216,6 +255,7 @@ function StudentsPage() {
                   <p className="text-xs text-muted-foreground">
                     {student.grade || "بدون صف"} • {groupName(student.group_id)}
                   </p>
+                  <p className="mt-1 font-mono text-xs font-semibold text-primary" dir="ltr">كود الطالب: {student.student_code}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

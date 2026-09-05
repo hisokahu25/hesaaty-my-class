@@ -26,6 +26,7 @@ export type Student = {
   parent_phone: string;
   address: string;
   notes: string;
+  student_code: string;
 };
 
 export type Payment = {
@@ -119,10 +120,6 @@ export async function ensureAccountSetup() {
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id);
-
-  if (!roles || roles.length === 0) {
-    await supabase.from("user_roles").insert({ user_id: user.id, role });
-  }
 
   const finalRoles = (roles ?? []).map((r) => r.role as AppRole);
   return {

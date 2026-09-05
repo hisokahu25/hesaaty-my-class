@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -213,6 +213,11 @@ function AuthPage() {
               {loading ? "جارٍ..." : mode === "signin" ? "تسجيل الدخول" : "إنشاء الحساب"}
             </Button>
           </form>
+          <div className="mt-4 border-t border-border pt-4 text-center">
+            <Link to="/portal" className="text-sm font-medium text-primary hover:underline">
+              دخول الطالب أو ولي الأمر بكود الطالب
+            </Link>
+          </div>
 
           {mode === "signin" ? (
             <button
