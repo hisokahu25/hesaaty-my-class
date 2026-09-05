@@ -59,33 +59,299 @@ export type Database = {
           },
         ]
       }
-      exams: {
+      exam_answer_keys: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          question_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          question_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          question_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_answer_keys_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: true
+            referencedRelation: "exam_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_answers: {
+        Row: {
+          answer_text: string
+          created_at: string
+          grader_comment: string
+          id: string
+          is_correct: boolean | null
+          points_awarded: number | null
+          question_id: string
+          submission_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          answer_text?: string
+          created_at?: string
+          grader_comment?: string
+          id?: string
+          is_correct?: boolean | null
+          points_awarded?: number | null
+          question_id: string
+          submission_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          answer_text?: string
+          created_at?: string
+          grader_comment?: string
+          id?: string
+          is_correct?: boolean | null
+          points_awarded?: number | null
+          question_id?: string
+          submission_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "exam_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_answers_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "exam_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_assignments: {
         Row: {
           created_at: string
-          exam_date: string
+          exam_id: string
           group_id: string | null
           id: string
-          max_score: number
+          student_id: string | null
           teacher_id: string
-          title: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
-          exam_date?: string
+          exam_id: string
           group_id?: string | null
           id?: string
-          max_score?: number
+          student_id?: string | null
           teacher_id: string
-          title: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
+          exam_id?: string
+          group_id?: string | null
+          id?: string
+          student_id?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_assignments_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_assignments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_questions: {
+        Row: {
+          created_at: string
+          exam_id: string
+          id: string
+          options: Json
+          points: number
+          position: number
+          prompt: string
+          question_type: Database["public"]["Enums"]["exam_question_type"]
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          id?: string
+          options?: Json
+          points?: number
+          position?: number
+          prompt: string
+          question_type: Database["public"]["Enums"]["exam_question_type"]
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          id?: string
+          options?: Json
+          points?: number
+          position?: number
+          prompt?: string
+          question_type?: Database["public"]["Enums"]["exam_question_type"]
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_questions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_submissions: {
+        Row: {
+          auto_score: number
+          created_at: string
+          exam_id: string
+          final_score: number | null
+          graded_at: string | null
+          id: string
+          manual_score: number | null
+          started_at: string
+          status: Database["public"]["Enums"]["exam_submission_status"]
+          student_id: string
+          submitted_at: string | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_score?: number
+          created_at?: string
+          exam_id: string
+          final_score?: number | null
+          graded_at?: string | null
+          id?: string
+          manual_score?: number | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["exam_submission_status"]
+          student_id: string
+          submitted_at?: string | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_score?: number
+          created_at?: string
+          exam_id?: string
+          final_score?: number | null
+          graded_at?: string | null
+          id?: string
+          manual_score?: number | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["exam_submission_status"]
+          student_id?: string
+          submitted_at?: string | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_submissions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exams: {
+        Row: {
+          created_at: string
+          ends_at: string | null
+          exam_date: string
+          group_id: string | null
+          id: string
+          instructions: string
+          kind: Database["public"]["Enums"]["exam_kind"]
+          max_score: number
+          publish_status: Database["public"]["Enums"]["exam_publish_status"]
+          starts_at: string | null
+          teacher_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string | null
           exam_date?: string
           group_id?: string | null
           id?: string
+          instructions?: string
+          kind?: Database["public"]["Enums"]["exam_kind"]
           max_score?: number
+          publish_status?: Database["public"]["Enums"]["exam_publish_status"]
+          starts_at?: string | null
+          teacher_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string | null
+          exam_date?: string
+          group_id?: string | null
+          id?: string
+          instructions?: string
+          kind?: Database["public"]["Enums"]["exam_kind"]
+          max_score?: number
+          publish_status?: Database["public"]["Enums"]["exam_publish_status"]
+          starts_at?: string | null
           teacher_id?: string
           title?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -267,6 +533,73 @@ export type Database = {
         }
         Relationships: []
       }
+      student_portal_credentials: {
+        Row: {
+          created_at: string
+          password_changed_at: string | null
+          password_hash: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          password_changed_at?: string | null
+          password_hash: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          password_changed_at?: string | null
+          password_hash?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_portal_credentials_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_portal_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          student_id: string
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          student_id: string
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          student_id?: string
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_portal_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           address: string
@@ -279,6 +612,7 @@ export type Database = {
           parent_phone: string
           parent_user_id: string | null
           school: string
+          student_code: string
           teacher_id: string
         }
         Insert: {
@@ -292,6 +626,7 @@ export type Database = {
           parent_phone?: string
           parent_user_id?: string | null
           school?: string
+          student_code: string
           teacher_id: string
         }
         Update: {
@@ -305,6 +640,7 @@ export type Database = {
           parent_phone?: string
           parent_user_id?: string | null
           school?: string
+          student_code?: string
           teacher_id?: string
         }
         Relationships: [
@@ -340,6 +676,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authenticate_student_portal: {
+        Args: { _password: string; _student_code: string }
+        Returns: string
+      }
+      finalize_essay_submission: {
+        Args: { _submission_id: string }
+        Returns: undefined
+      }
+      generate_student_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -348,10 +693,18 @@ export type Database = {
         Returns: boolean
       }
       is_parent_of_student: { Args: { _student_id: string }; Returns: boolean }
+      set_student_portal_password: {
+        Args: { _password: string; _student_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "teacher" | "parent" | "student"
       attendance_status: "present" | "absent" | "late"
+      exam_kind: "paper" | "online" | "essay"
+      exam_publish_status: "draft" | "published"
+      exam_question_type: "mcq" | "true_false" | "essay"
+      exam_submission_status: "in_progress" | "submitted" | "graded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -481,6 +834,10 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "teacher", "parent", "student"],
       attendance_status: ["present", "absent", "late"],
+      exam_kind: ["paper", "online", "essay"],
+      exam_publish_status: ["draft", "published"],
+      exam_question_type: ["mcq", "true_false", "essay"],
+      exam_submission_status: ["in_progress", "submitted", "graded"],
     },
   },
 } as const
