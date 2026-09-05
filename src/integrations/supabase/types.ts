@@ -685,14 +685,6 @@ export type Database = {
         Returns: undefined
       }
       generate_student_code: { Args: never; Returns: string }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_parent_of_student: { Args: { _student_id: string }; Returns: boolean }
       service_set_student_portal_password: {
         Args: { _password: string; _student_id: string }
         Returns: undefined
