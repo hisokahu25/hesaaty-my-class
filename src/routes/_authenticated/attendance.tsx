@@ -4,7 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, EmptyState, SectionTitle } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
 import {
   fetchGroups,
   fetchStudents,
@@ -100,6 +102,51 @@ function AttendancePage() {
   });
 
   const visible = (students.data ?? []).filter((s) => !groupId || s.group_id === groupId);
+
+  const markAll = useMutation({
+    mutationFn: async (status: AttendanceStatus) => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("انتهت الجلسة");
+      if (visible.length === 0) throw new Error("لا يوجد طلاب");
+      const rows = visible.map((s) => ({
+        teacher_id: auth.user!.id,
+        student_id: s.id,
+        group_id: s.group_id,
+        session_date: date,
+        status,
+      }));
+      const { error } = await supabase
+        .from("attendance")
+        .upsert(rows, { onConflict: "student_id,session_date" });
+      if (error) throw error;
+    },
+    onSuccess: (_d, status) => {
+      toast.success(status === "absent" ? "تم إلغاء الحصة وتسجيل غياب الجميع" : "تم تسجيل حضور الجميع");
+      queryClient.invalidateQueries({ queryKey: ["attendance", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-all"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const clearDay = useMutation({
+    mutationFn: async () => {
+      const ids = visible.map((s) => s.id);
+      if (ids.length === 0) throw new Error("لا يوجد طلاب");
+      const { error } = await supabase
+        .from("attendance")
+        .delete()
+        .eq("session_date", date)
+        .in("student_id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم مسح تسجيل هذا اليوم");
+      queryClient.invalidateQueries({ queryKey: ["attendance", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-all"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const statusOf = (id: string) =>
     records.data?.find((r) => r.student_id === id)?.status as AttendanceStatus | undefined;
 
@@ -109,6 +156,7 @@ function AttendancePage() {
     const present = rows.filter((r) => r.status !== "absent").length;
     return Math.round((present / rows.length) * 100);
   };
+
 
   return (
     <AppShell title="الحضور" subtitle="تسجيل سريع للحضور">
@@ -128,7 +176,39 @@ function AttendancePage() {
         <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
 
+      <div className="grid grid-cols-3 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={markAll.isPending || visible.length === 0}
+          onClick={() => {
+            if (window.confirm("سيتم تسجيل غياب كل طلاب هذه القائمة في هذا التاريخ (إلغاء الحصة). متأكد؟")) {
+              markAll.mutate("absent");
+            }
+          }}
+        >
+          إلغاء الحصة
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={markAll.isPending || visible.length === 0}
+          onClick={() => markAll.mutate("present")}
+        >
+          حضور الكل
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={clearDay.isPending || visible.length === 0}
+          onClick={() => clearDay.mutate()}
+        >
+          مسح التسجيل
+        </Button>
+      </div>
+
       <SectionTitle title="تسجيل سريع للحضور" aside={formatDateAr(date)} />
+
 
       {visible.length === 0 ? (
         <EmptyState text="لا يوجد طلاب في هذه المجموعة." />
