@@ -689,10 +689,6 @@ export type Database = {
         Args: { _password: string; _student_id: string }
         Returns: undefined
       }
-      set_student_portal_password: {
-        Args: { _password: string; _student_id: string }
-        Returns: undefined
-      }
     }
     Enums: {
       app_role: "admin" | "teacher" | "parent" | "student"
