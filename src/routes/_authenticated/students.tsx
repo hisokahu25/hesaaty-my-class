@@ -159,14 +159,6 @@ function StudentsPage() {
           </DialogHeader>
           <div className="space-y-3">
             <Field label="الاسم" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
-            <Field label="الصف" value={form.grade} onChange={(v) => setForm({ ...form, grade: v })} />
-            <Field label="رقم ولي الأمر" value={form.parent_phone} onChange={(v) => setForm({ ...form, parent_phone: v })} />
-            {!editingId ? (
-              <div className="space-y-2">
-                <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
-                <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="٤ أحرف على الأقل" />
-              </div>
-            ) : null}
             <div className="space-y-2">
               <Label>المجموعة</Label>
               <select
@@ -190,6 +182,15 @@ function StudentsPage() {
                 ))}
               </select>
             </div>
+            <Field label="الصف" value={form.grade} onChange={(v) => setForm({ ...form, grade: v })} />
+            <Field label="رقم ولي الأمر" value={form.parent_phone} onChange={(v) => setForm({ ...form, parent_phone: v })} />
+            {!editingId ? (
+              <div className="space-y-2">
+                <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
+                <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="٤ أحرف على الأقل" />
+              </div>
+            ) : null}
+
             <div className="space-y-2">
               <Label>ملاحظات</Label>
               <Textarea
