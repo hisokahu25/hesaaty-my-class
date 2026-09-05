@@ -174,7 +174,39 @@ function AttendancePage() {
         <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
 
+      <div className="grid grid-cols-3 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={markAll.isPending || visible.length === 0}
+          onClick={() => {
+            if (window.confirm("سيتم تسجيل غياب كل طلاب هذه القائمة في هذا التاريخ (إلغاء الحصة). متأكد؟")) {
+              markAll.mutate("absent");
+            }
+          }}
+        >
+          إلغاء الحصة
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={markAll.isPending || visible.length === 0}
+          onClick={() => markAll.mutate("present")}
+        >
+          حضور الكل
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={clearDay.isPending || visible.length === 0}
+          onClick={() => clearDay.mutate()}
+        >
+          مسح التسجيل
+        </Button>
+      </div>
+
       <SectionTitle title="تسجيل سريع للحضور" aside={formatDateAr(date)} />
+
 
       {visible.length === 0 ? (
         <EmptyState text="لا يوجد طلاب في هذه المجموعة." />
