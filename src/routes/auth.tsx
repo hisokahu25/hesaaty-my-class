@@ -88,7 +88,27 @@ function AuthPage() {
     }
   }
 
+  async function handleForgot() {
+    if (!email.trim()) {
+      toast.error("أدخل بريدك الإلكتروني أولًا ثم اضغط نسيت كلمة المرور");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/account`,
+      });
+      if (error) throw error;
+      toast.success("أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذّر إرسال الرابط");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleGoogle() {
+
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
     });
@@ -195,6 +215,17 @@ function AuthPage() {
               {loading ? "جارٍ..." : mode === "signin" ? "تسجيل الدخول" : "إنشاء الحساب"}
             </Button>
           </form>
+
+          {mode === "signin" ? (
+            <button
+              type="button"
+              onClick={handleForgot}
+              className="mt-3 w-full text-center text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              نسيت كلمة المرور؟
+            </button>
+          ) : null}
+
 
           <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />

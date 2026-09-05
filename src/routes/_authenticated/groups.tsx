@@ -12,9 +12,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { fetchGroups, fetchStudents, formatMoney, WEEK_DAYS } from "@/lib/db";
+import { fetchGroups, fetchStudents, formatMoney, WEEK_DAYS, type Group } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/groups")({
   head: () => ({
@@ -41,21 +40,43 @@ const EMPTY = {
   days: [] as string[],
 };
 
+type FormState = typeof EMPTY;
+
 function GroupsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(EMPTY);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY);
 
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
 
-  const addGroup = useMutation({
+  function openNew() {
+    setEditingId(null);
+    setForm(EMPTY);
+    setOpen(true);
+  }
+
+  function openEdit(group: Group) {
+    setEditingId(group.id);
+    setForm({
+      name: group.name,
+      grade: group.grade,
+      subject: group.subject,
+      location: group.location,
+      start_time: group.start_time.slice(0, 5),
+      fee: String(group.fee ?? 0),
+      days: group.days ?? [],
+    });
+    setOpen(true);
+  }
+
+  const saveGroup = useMutation({
     mutationFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!form.name.trim()) throw new Error("اسم المجموعة مطلوب");
-      const { error } = await supabase.from("groups").insert({
-        teacher_id: auth.user.id,
+      const payload = {
         name: form.name.trim().slice(0, 100),
         grade: form.grade.trim().slice(0, 60),
         subject: form.subject.trim().slice(0, 60),
@@ -63,14 +84,38 @@ function GroupsPage() {
         start_time: form.start_time,
         fee: Number(form.fee) || 0,
         days: form.days,
-      });
+      };
+      if (editingId) {
+        const { error } = await supabase.from("groups").update(payload).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("groups")
+          .insert({ teacher_id: auth.user.id, ...payload });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success(editingId ? "تم تحديث المجموعة" : "تمت إضافة المجموعة");
+      setForm(EMPTY);
+      setEditingId(null);
+      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["groups"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteGroup = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("groups").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("تمت إضافة المجموعة");
-      setForm(EMPTY);
+      toast.success("تم حذف المجموعة");
       setOpen(false);
+      setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ["groups"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -83,79 +128,96 @@ function GroupsPage() {
       <SectionTitle
         title={`${groups.data?.length ?? 0} مجموعة`}
         aside={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">إضافة مجموعة</Button>
-            </DialogTrigger>
-            <DialogContent dir="rtl" className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-right">مجموعة جديدة</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <Row label="اسم المجموعة" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
-                <Row label="الصف" value={form.grade} onChange={(v) => setForm({ ...form, grade: v })} />
-                <Row label="المادة" value={form.subject} onChange={(v) => setForm({ ...form, subject: v })} />
-                <Row label="مكان الحصة" value={form.location} onChange={(v) => setForm({ ...form, location: v })} />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>الساعة</Label>
-                    <Input
-                      type="time"
-                      value={form.start_time}
-                      onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>قيمة الاشتراك</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={form.fee}
-                      onChange={(e) => setForm({ ...form, fee: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>الأيام</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {WEEK_DAYS.map((day) => {
-                      const active = form.days.includes(day);
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() =>
-                            setForm({
-                              ...form,
-                              days: active
-                                ? form.days.filter((d) => d !== day)
-                                : [...form.days, day],
-                            })
-                          }
-                          className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
-                            active
-                              ? "bg-primary text-primary-foreground ring-primary"
-                              : "bg-card text-muted-foreground ring-border"
-                          }`}
-                        >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <Button
-                  className="w-full"
-                  disabled={addGroup.isPending}
-                  onClick={() => addGroup.mutate()}
-                >
-                  حفظ المجموعة
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" onClick={openNew}>
+            إضافة مجموعة
+          </Button>
         }
       />
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent dir="rtl" className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-right">
+              {editingId ? "تعديل المجموعة" : "مجموعة جديدة"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Row label="اسم المجموعة" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+            <Row label="الصف" value={form.grade} onChange={(v) => setForm({ ...form, grade: v })} />
+            <Row label="المادة" value={form.subject} onChange={(v) => setForm({ ...form, subject: v })} />
+            <Row label="مكان الحصة" value={form.location} onChange={(v) => setForm({ ...form, location: v })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>الساعة</Label>
+                <Input
+                  type="time"
+                  value={form.start_time}
+                  onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>قيمة الاشتراك</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.fee}
+                  onChange={(e) => setForm({ ...form, fee: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>الأيام</Label>
+              <div className="flex flex-wrap gap-2">
+                {WEEK_DAYS.map((day) => {
+                  const active = form.days.includes(day);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          days: active
+                            ? form.days.filter((d) => d !== day)
+                            : [...form.days, day],
+                        })
+                      }
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
+                        active
+                          ? "bg-primary text-primary-foreground ring-primary"
+                          : "bg-card text-muted-foreground ring-border"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              disabled={saveGroup.isPending}
+              onClick={() => saveGroup.mutate()}
+            >
+              {editingId ? "حفظ التعديلات" : "حفظ المجموعة"}
+            </Button>
+            {editingId ? (
+              <Button
+                variant="outline"
+                className="w-full text-destructive"
+                disabled={deleteGroup.isPending}
+                onClick={() => {
+                  if (window.confirm("سيتم حذف المجموعة. هل أنت متأكد؟")) {
+                    deleteGroup.mutate(editingId);
+                  }
+                }}
+              >
+                حذف المجموعة
+              </Button>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {(groups.data?.length ?? 0) === 0 ? (
         <EmptyState text="لا توجد مجموعات بعد. أنشئ أول مجموعة لتبدأ جدولة الحصص." />
@@ -186,6 +248,14 @@ function GroupsPage() {
                   <p className="text-[10px] text-muted-foreground">
                     {formatMoney(countIn(group.id))} طالب
                   </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => openEdit(group)}
+                  >
+                    تعديل
+                  </Button>
                 </div>
               </div>
             </div>
