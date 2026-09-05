@@ -26,6 +26,7 @@ export type Student = {
   parent_phone: string;
   address: string;
   notes: string;
+  student_code: string;
 };
 
 export type Payment = {
