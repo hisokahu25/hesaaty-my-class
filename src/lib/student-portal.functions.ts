@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");

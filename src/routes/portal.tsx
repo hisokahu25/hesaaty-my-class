@@ -11,8 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { changePortalPassword, getPortalExam, getStudentPortal, loginStudentPortal, submitPortalExam } from "@/lib/student-portal.functions";
 
-type PortalData = Awaited<ReturnType<ReturnType<typeof useServerFn<typeof getStudentPortal>>>>;
-
 export const Route = createFileRoute("/portal")({
   ssr: false,
   head: () => ({ meta: [

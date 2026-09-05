@@ -121,10 +121,6 @@ export async function ensureAccountSetup() {
     .select("role")
     .eq("user_id", user.id);
 
-  if (!roles || roles.length === 0) {
-    await supabase.from("user_roles").insert({ user_id: user.id, role });
-  }
-
   const finalRoles = (roles ?? []).map((r) => r.role as AppRole);
   return {
     userId: user.id,
