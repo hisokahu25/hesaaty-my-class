@@ -88,7 +88,27 @@ function AuthPage() {
     }
   }
 
+  async function handleForgot() {
+    if (!email.trim()) {
+      toast.error("أدخل بريدك الإلكتروني أولًا ثم اضغط نسيت كلمة المرور");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/account`,
+      });
+      if (error) throw error;
+      toast.success("أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذّر إرسال الرابط");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleGoogle() {
+
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
     });
