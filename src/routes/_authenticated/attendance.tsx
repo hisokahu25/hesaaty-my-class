@@ -100,6 +100,51 @@ function AttendancePage() {
   });
 
   const visible = (students.data ?? []).filter((s) => !groupId || s.group_id === groupId);
+
+  const markAll = useMutation({
+    mutationFn: async (status: AttendanceStatus) => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("انتهت الجلسة");
+      if (visible.length === 0) throw new Error("لا يوجد طلاب");
+      const rows = visible.map((s) => ({
+        teacher_id: auth.user!.id,
+        student_id: s.id,
+        group_id: s.group_id,
+        session_date: date,
+        status,
+      }));
+      const { error } = await supabase
+        .from("attendance")
+        .upsert(rows, { onConflict: "student_id,session_date" });
+      if (error) throw error;
+    },
+    onSuccess: (_d, status) => {
+      toast.success(status === "absent" ? "تم إلغاء الحصة وتسجيل غياب الجميع" : "تم تسجيل حضور الجميع");
+      queryClient.invalidateQueries({ queryKey: ["attendance", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-all"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const clearDay = useMutation({
+    mutationFn: async () => {
+      const ids = visible.map((s) => s.id);
+      if (ids.length === 0) throw new Error("لا يوجد طلاب");
+      const { error } = await supabase
+        .from("attendance")
+        .delete()
+        .eq("session_date", date)
+        .in("student_id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم مسح تسجيل هذا اليوم");
+      queryClient.invalidateQueries({ queryKey: ["attendance", date] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-all"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const statusOf = (id: string) =>
     records.data?.find((r) => r.student_id === id)?.status as AttendanceStatus | undefined;
 
@@ -109,6 +154,7 @@ function AttendancePage() {
     const present = rows.filter((r) => r.status !== "absent").length;
     return Math.round((present / rows.length) * 100);
   };
+
 
   return (
     <AppShell title="الحضور" subtitle="تسجيل سريع للحضور">
