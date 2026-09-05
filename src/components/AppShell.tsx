@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, BarChart3, CreditCard, Home, LogOut, CalendarDays, Users, User } from "lucide-react";
+import { Bell, BarChart3, CreditCard, Home, LogOut, CalendarDays, Users, User, ClipboardList } from "lucide-react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/students", label: "الطلاب", icon: Users },
   { to: "/groups", label: "الجدول", icon: CalendarDays },
   { to: "/grades", label: "الدرجات", icon: Bell },
+  { to: "/exams", label: "الامتحانات", icon: ClipboardList },
   { to: "/payments", label: "المالية", icon: CreditCard },
   { to: "/stats", label: "الإحصائيات", icon: BarChart3 },
 ] as const;
