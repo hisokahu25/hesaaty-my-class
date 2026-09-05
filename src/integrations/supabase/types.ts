@@ -626,7 +626,7 @@ export type Database = {
           parent_phone?: string
           parent_user_id?: string | null
           school?: string
-          student_code: string
+          student_code?: string
           teacher_id: string
         }
         Update: {
