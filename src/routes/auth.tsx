@@ -107,16 +107,15 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
-
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
-    if (result.error) {
+    if (error) {
       toast.error("تعذّر تسجيل الدخول عبر جوجل");
-      return;
     }
-    if (result.redirected) return;
-    await goHome();
   }
 
   return (
