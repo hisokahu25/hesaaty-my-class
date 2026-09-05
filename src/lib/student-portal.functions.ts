@@ -18,7 +18,7 @@ async function getPortalStudent(token: string) {
 }
 
 export const loginStudentPortal = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({ code: z.string().trim().min(6).max(6), password: z.string().min(4).max(72) }).parse(input))
+  .validator((input) => z.object({ code: z.string().trim().min(6).max(6), password: z.string().min(4).max(72) }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: studentId, error } = await supabaseAdmin.rpc("authenticate_student_portal", {
@@ -38,7 +38,7 @@ export const loginStudentPortal = createServerFn({ method: "POST" })
   });
 
 export const getStudentPortal = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({ token: z.string().length(64) }).parse(input))
+  .validator((input) => z.object({ token: z.string().length(64) }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin, studentId } = await getPortalStudent(data.token);
     const { data: student, error: studentError } = await supabaseAdmin
@@ -75,7 +75,7 @@ export const getStudentPortal = createServerFn({ method: "POST" })
   });
 
 export const getPortalExam = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({ token: z.string().length(64), examId: z.string().uuid() }).parse(input))
+  .validator((input) => z.object({ token: z.string().length(64), examId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin, studentId } = await getPortalStudent(data.token);
     const { data: student } = await supabaseAdmin.from("students").select("group_id").eq("id", studentId).single();
@@ -122,7 +122,7 @@ export const getPortalExam = createServerFn({ method: "POST" })
   });
 
 export const submitPortalExam = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({
+  .validator((input) => z.object({
     token: z.string().length(64),
     examId: z.string().uuid(),
     submissionId: z.string().uuid(),
@@ -155,7 +155,7 @@ export const submitPortalExam = createServerFn({ method: "POST" })
   });
 
 export const changePortalPassword = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({ token: z.string().length(64), password: z.string().min(4).max(72) }).parse(input))
+  .validator((input) => z.object({ token: z.string().length(64), password: z.string().min(4).max(72) }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin, studentId } = await getPortalStudent(data.token);
     const { error } = await supabaseAdmin.rpc("service_set_student_portal_password", { _student_id: studentId, _password: data.password });
@@ -165,7 +165,7 @@ export const changePortalPassword = createServerFn({ method: "POST" })
 
 export const setStudentPortalPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ studentId: z.string().uuid(), password: z.string().min(4).max(72) }).parse(input))
+  .validator((input) => z.object({ studentId: z.string().uuid(), password: z.string().min(4).max(72) }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: student } = await context.supabase.from("students").select("id").eq("id", data.studentId).maybeSingle();
     if (!student) throw new Error("الطالب غير موجود أو غير مصرح لك");
@@ -177,7 +177,7 @@ export const setStudentPortalPassword = createServerFn({ method: "POST" })
 
 export const finalizeEssaySubmission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ submissionId: z.string().uuid() }).parse(input))
+  .validator((input) => z.object({ submissionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: submission } = await context.supabase.from("exam_submissions").select("id").eq("id", data.submissionId).maybeSingle();
     if (!submission) throw new Error("المحاولة غير موجودة أو غير مصرح لك");
