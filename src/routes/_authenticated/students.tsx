@@ -149,7 +149,15 @@ function StudentsPage() {
               <Label>المجموعة</Label>
               <select
                 value={form.group_id}
-                onChange={(e) => setForm({ ...form, group_id: e.target.value })}
+                onChange={(e) => {
+                  const groupId = e.target.value;
+                  const group = groups.data?.find((g) => g.id === groupId);
+                  setForm({
+                    ...form,
+                    group_id: groupId,
+                    grade: group?.grade ?? form.grade,
+                  });
+                }}
                 className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
               >
                 <option value="">بدون مجموعة</option>
