@@ -26,9 +26,12 @@ export const Route = createFileRoute("/_authenticated/account")({
 
 function AccountPage() {
   const role = useMyRole();
+  const queryClient = useQueryClient();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [fullName, setFullName] = useState("");
 
   const profile = useQuery({
     queryKey: ["my-profile"],
@@ -71,14 +74,83 @@ function AccountPage() {
     toast.success("تم تحديث كلمة المرور");
   }
 
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = fullName.trim();
+    if (!trimmed) {
+      toast.error("أدخل الاسم بالكامل");
+      return;
+    }
+    setSaving(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) {
+      setSaving(false);
+      toast.error("لم يتم التعرف على المستخدم");
+      return;
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: trimmed })
+      .eq("id", user.id);
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await supabase.auth.updateUser({ data: { full_name: trimmed } });
+    queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+    setEditingName(false);
+    toast.success("تم تحديث الاسم");
+  }
+
+  function startEditingName() {
+    setFullName(profile.data?.fullName ?? "");
+    setEditingName(true);
+  }
+
   return (
     <AppShell title="حسابي" subtitle="البيانات والأمان">
       <section className="space-y-3">
         <SectionTitle title="بيانات الحساب" />
         <div className="space-y-2 rounded-xl bg-card p-4 text-sm shadow-sm ring-1 ring-border">
-          <Row label="الاسم" value={profile.data?.fullName || "—"} />
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">الاسم</span>
+            {editingName ? (
+              <form onSubmit={saveName} className="flex flex-1 items-center gap-2">
+                <Input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  maxLength={100}
+                  className="h-8 flex-1"
+                />
+                <Button type="submit" size="sm" disabled={saving}>
+                  {saving ? "جارٍ..." : "حفظ"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingName(false)}
+                  disabled={saving}
+                >
+                  إلغاء
+                </Button>
+              </form>
+            ) : (
+              <div className="flex flex-1 items-center justify-between gap-2">
+                <span className="font-medium">{profile.data?.fullName || "—"}</span>
+                <button
+                  type="button"
+                  onClick={startEditingName}
+                  className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  تعديل
+                </button>
+              </div>
+            )}
+          </div>
           <Row label="البريد" value={profile.data?.email || "—"} />
-          <Row label="الهاتف" value={profile.data?.phone || "—"} />
           <Row
             label="نوع الحساب"
             value={role.data ? ROLE_LABEL[role.data] : "—"}
