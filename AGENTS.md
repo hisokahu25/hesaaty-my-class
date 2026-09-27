@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Generate `students.student_code` only through the protected `prepare_student_code` trigger; a callable column default blocks authenticated inserts after helper execution is revoked.
