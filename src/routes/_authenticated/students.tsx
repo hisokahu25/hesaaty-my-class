@@ -77,8 +77,7 @@ function StudentsPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!form.full_name.trim()) throw new Error("اسم الطالب مطلوب");
-      if (!editingId && newPassword.length < 4) throw new Error("حدد كلمة مرور من ٤ أحرف على الأقل");
-      if (!editingId && form.parent_phone.replace(/\D/g, "").length < 4) throw new Error("رقم ولي الأمر يجب أن يحتوي على ٤ أرقام على الأقل");
+      if (!editingId && newPassword && newPassword.length < 4) throw new Error("كلمة المرور يجب أن تكون ٤ أحرف على الأقل");
       const payload = {
         full_name: form.full_name.trim().slice(0, 100),
         grade: form.grade.trim().slice(0, 60),
@@ -96,7 +95,9 @@ function StudentsPage() {
           .select("id")
           .single();
         if (error) throw error;
-        await updatePortalPassword({ data: { studentId: student.id, password: newPassword } });
+        if (newPassword) {
+          await updatePortalPassword({ data: { studentId: student.id, password: newPassword } });
+        }
       }
     },
     onSuccess: () => {
@@ -187,7 +188,7 @@ function StudentsPage() {
             {!editingId ? (
               <div className="space-y-2">
                 <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
-                <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="٤ أحرف على الأقل" />
+                <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="اختياري — الافتراضي آخر ٤ أرقام من هاتف ولي الأمر" />
               </div>
             ) : null}
 
