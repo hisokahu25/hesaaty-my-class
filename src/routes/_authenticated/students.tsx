@@ -91,7 +91,7 @@ function StudentsPage() {
       } else {
         const { data: student, error } = await supabase
           .from("students")
-          .insert({ teacher_id: auth.user.id, ...payload })
+          .insert({ teacher_id: auth.user.id, student_code: "", ...payload })
           .select("id")
           .single();
         if (error) throw error;
