@@ -90,24 +90,39 @@ function PaymentsPage() {
       if (!auth.user) throw new Error("انتهت الجلسة");
       const amount = Number(expAmount);
       if (!amount || amount <= 0) throw new Error("أدخل مبلغ المصروف");
-      const { error } = await supabase.from("expenses").insert({
+      const row = {
         teacher_id: auth.user.id,
         category: expCategory,
         amount,
         month: expMonth,
         notes: expCategory === "other" ? expNotes.trim().slice(0, 500) : "",
-      });
+      };
+      const { error } = expEditId
+        ? await supabase.from("expenses").update(row).eq("id", expEditId)
+        : await supabase.from("expenses").insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("تم تسجيل المصروف");
+      toast.success(expEditId ? "تم تعديل المصروف" : "تم تسجيل المصروف");
       setExpOpen(false);
+      setExpEditId(null);
       setExpAmount("");
       setExpNotes("");
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function editExpense(id: string) {
+    const e = (expenses.data ?? []).find((x) => x.id === id);
+    if (!e) return;
+    setExpEditId(id);
+    setExpCategory(e.category as ExpenseCategory);
+    setExpAmount(String(Number(e.amount)));
+    setExpMonth(e.month);
+    setExpNotes(e.notes ?? "");
+    setExpOpen(true);
+  }
 
   const deleteExpense = useMutation({
     mutationFn: async (id: string) => {
@@ -133,19 +148,47 @@ function PaymentsPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!studentId) throw new Error("اختر الطالب");
-      const { error } = await supabase.from("payments").insert({
+      const row = {
         teacher_id: auth.user.id,
         student_id: studentId,
         month,
         amount_due: Number(amountDue) || 0,
         amount_paid: Number(amountPaid) || 0,
         paid_at: Number(amountPaid) > 0 ? new Date().toISOString().slice(0, 10) : null,
-      });
+      };
+      const { error } = editId
+        ? await supabase.from("payments").update(row).eq("id", editId)
+        : await supabase.from("payments").insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("تم تسجيل الدفعة");
+      toast.success(editId ? "تم تعديل الدفعة" : "تم تسجيل الدفعة");
       setOpen(false);
+      setEditId(null);
+      queryClient.invalidateQueries({ queryKey: ["payments-list"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function editPayment(id: string) {
+    const p = (payments.data ?? []).find((x) => x.id === id);
+    if (!p) return;
+    setEditId(id);
+    setStudentId(p.student_id);
+    setMonth(p.month);
+    setAmountDue(String(Number(p.amount_due)));
+    setAmountPaid(String(Number(p.amount_paid)));
+    setOpen(true);
+  }
+
+  const deletePayment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("payments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم حذف الدفعة");
       queryClient.invalidateQueries({ queryKey: ["payments-list"] });
       queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
     },
