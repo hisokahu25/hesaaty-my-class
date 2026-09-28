@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchGroups, fetchStudents, initials, type Student } from "@/lib/db";
-import { setStudentPortalPassword } from "@/lib/student-portal.functions";
 
 export const Route = createFileRoute("/_authenticated/students")({
   head: () => ({
@@ -47,7 +46,10 @@ function StudentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [newPassword, setNewPassword] = useState("");
-  const updatePortalPassword = useServerFn(setStudentPortalPassword);
+  const updatePortalPassword = async ({ data }: { data: { studentId: string; password: string } }) => {
+    const { error } = await supabase.rpc("teacher_set_student_portal_password", { _student_id: data.studentId, _password: data.password });
+    if (error) throw new Error(error.message);
+  };
 
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
