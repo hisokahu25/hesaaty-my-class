@@ -1,13 +1,8 @@
 {
   "name": "hesaaty-my-class",
   "compatibility_date": "2026-01-01",
-  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  },
-  "vars": {
-    "SUPABASE_URL": "https://ywagpoosjqdunisninuq.supabase.co",
-    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_h9tlXvM_IfcaruD7b0QD-w_0DUm6x8M"
   }
 }
