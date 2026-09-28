@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock3, FileText, Lock, LockOpen, Pencil, Plus, Send, Trash2 } from "lucide-react";
@@ -15,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchGroups, fetchStudents } from "@/lib/db";
-import { finalizeEssaySubmission } from "@/lib/student-portal.functions";
 
 type ExamKind = "online" | "essay";
 type Question = { type: "mcq" | "true_false" | "essay"; prompt: string; points: string; options: string[]; correct: string };
@@ -48,7 +46,10 @@ export const Route = createFileRoute("/_authenticated/exams")({
 
 function ExamsPage() {
   const qc = useQueryClient();
-  const finishEssay = useServerFn(finalizeEssaySubmission);
+  const finishEssay = async ({ data }: { data: { submissionId: string } }) => {
+    const { error } = await supabase.rpc("finalize_essay_submission", { _submission_id: data.submissionId });
+    if (error) throw new Error(error.message);
+  };
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<ExamKind>("online");
   const [title, setTitle] = useState("");
