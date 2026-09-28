@@ -29,7 +29,7 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [role, setRole] = useState<"teacher" | "parent">("teacher");
+  const role = "teacher" as const;
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -162,25 +162,6 @@ function AuthPage() {
                     maxLength={100}
                     placeholder="أ/ محمد علي"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>نوع الحساب</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["teacher", "parent"] as const).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        className={`rounded-lg py-2 text-sm font-medium ring-1 transition-colors ${
-                          role === r
-                            ? "bg-primary text-primary-foreground ring-primary"
-                            : "bg-card text-muted-foreground ring-border"
-                        }`}
-                      >
-                        {r === "teacher" ? "مدرس / مركز" : "ولي أمر"}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </>
             ) : null}
