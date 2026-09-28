@@ -727,6 +727,33 @@ export type Database = {
         Returns: undefined
       }
       generate_student_code: { Args: never; Returns: string }
+      portal_can_read_exam_image: {
+        Args: { _object_name: string; _token: string }
+        Returns: boolean
+      }
+      portal_change_password: {
+        Args: { _password: string; _token: string }
+        Returns: undefined
+      }
+      portal_get_dashboard: { Args: { _token: string }; Returns: Json }
+      portal_login: {
+        Args: { _password: string; _student_code: string }
+        Returns: Json
+      }
+      portal_open_exam: {
+        Args: { _exam_id: string; _token: string }
+        Returns: Json
+      }
+      portal_student_id: { Args: { _token: string }; Returns: string }
+      portal_submit_exam: {
+        Args: {
+          _answers: Json
+          _exam_id: string
+          _submission_id: string
+          _token: string
+        }
+        Returns: Json
+      }
       service_set_student_portal_password: {
         Args: { _password: string; _student_id: string }
         Returns: undefined
