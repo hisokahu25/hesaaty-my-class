@@ -163,7 +163,10 @@ function PaymentsPage() {
     setStudentId(id);
     const student = students.data?.find((s) => s.id === id);
     const group = groups.data?.find((g) => g.id === student?.group_id);
-    if (group) setAmountDue(String(Number(group.fee)));
+    if (group) {
+      setAmountDue(String(Number(group.fee)));
+      setAmountPaid(String(Number(group.fee)));
+    }
   }
 
   return (
