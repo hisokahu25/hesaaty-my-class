@@ -744,7 +744,6 @@ export type Database = {
         Args: { _exam_id: string; _token: string }
         Returns: Json
       }
-      portal_student_id: { Args: { _token: string }; Returns: string }
       portal_submit_exam: {
         Args: {
           _answers: Json
