@@ -2,12 +2,12 @@ name: Sync Fork with Upstream
 
 on:
   schedule:
-    - cron: '0 * * * *' # يتم التشغيل تلقائياً كل ساعة
-  workflow_dispatch:      # زر للتشغيل اليدوي متى ما أردت
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
-  workflows: write
+  actions: write
 
 jobs:
   sync:
