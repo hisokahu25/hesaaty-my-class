@@ -175,8 +175,7 @@ export const setStudentPortalPassword = createServerFn({ method: "POST" })
     const { data: student, error: lookupError } = await context.supabase.from("students").select("id").eq("id", data.studentId).maybeSingle();
     if (lookupError) throw new Error(`تعذر الاتصال بقاعدة البيانات من الخادم: ${lookupError.message}`);
     if (!student) throw new Error("الطالب غير موجود أو غير مصرح لك");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.rpc("service_set_student_portal_password", { _student_id: data.studentId, _password: data.password });
+    const { error } = await context.supabase.rpc("teacher_set_student_portal_password", { _student_id: data.studentId, _password: data.password });
     if (error) throw error;
     return { ok: true };
   });
@@ -187,8 +186,7 @@ export const finalizeEssaySubmission = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: submission } = await context.supabase.from("exam_submissions").select("id").eq("id", data.submissionId).maybeSingle();
     if (!submission) throw new Error("المحاولة غير موجودة أو غير مصرح لك");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.rpc("finalize_essay_submission", { _submission_id: data.submissionId });
+    const { error } = await context.supabase.rpc("finalize_essay_submission", { _submission_id: data.submissionId });
     if (error) throw error;
     return { ok: true };
   });
