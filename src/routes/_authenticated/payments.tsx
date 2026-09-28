@@ -380,8 +380,8 @@ function PaymentsPage() {
       {(payments.data?.length ?? 0) === 0 ? (
         <EmptyState text="لا توجد دفعات مسجلة بعد." />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-border">
-          <table className="w-full text-right text-sm">
+        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-border">
+          <table className="w-full min-w-[560px] text-right text-sm">
             <thead className="border-b border-border bg-secondary/60">
               <tr>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
