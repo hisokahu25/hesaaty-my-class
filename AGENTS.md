@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Generate `students.student_code` only through the protected `prepare_student_code` trigger; a callable column default blocks authenticated inserts after helper execution is revoked.
+- Run the student portal through token-validating database RPCs and the browser publishable client so external hosting never requires a service-role key.
