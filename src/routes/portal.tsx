@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { changePortalPassword, getPortalExam, getStudentPortal, loginStudentPortal, submitPortalExam } from "@/lib/student-portal.client";
+import { changePortalPassword, getPortalExam, getStudentPortal, loginStudentPortal, submitPortalExam } from "@/lib/student-portal-api";
 
 export const Route = createFileRoute("/portal")({
   ssr: false,
