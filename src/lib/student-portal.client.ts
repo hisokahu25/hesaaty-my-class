@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 type PortalAnswer = { questionId: string; answer: string };
 
@@ -14,39 +15,37 @@ function createPortalClient(token?: string) {
 
   return createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: token ? { headers: { "x-portal-token": token } } : undefined,
+    global: { headers: token ? { "x-portal-token": token } : {} },
   });
 }
 
 export async function loginStudentPortal(input: { code: string; password: string }) {
-  const client = createPortalClient();
-  const { data, error } = await client.rpc("portal_login", {
+  const { data, error } = await supabase.rpc("portal_login", {
     _student_code: input.code,
     _password: input.password,
   });
   if (error || !data) portalError(error, "كود الطالب أو كلمة المرور غير صحيحة");
-  return data as { token: string; expiresAt: string };
+  return data as unknown as { token: string; expiresAt: string };
 }
 
 export async function getStudentPortal(input: { token: string }) {
-  const client = createPortalClient(input.token);
-  const { data, error } = await client.rpc("portal_get_dashboard", { _token: input.token });
+  const { data, error } = await supabase.rpc("portal_get_dashboard", { _token: input.token });
   if (error || !data) portalError(error, "تعذر تحميل بوابة الطالب");
-  return data as Record<string, unknown>;
+  return data as unknown as Record<string, unknown>;
 }
 
 export async function getPortalExam(input: { token: string; examId: string }) {
-  const client = createPortalClient(input.token);
-  const { data, error } = await client.rpc("portal_open_exam", {
+  const { data, error } = await supabase.rpc("portal_open_exam", {
     _token: input.token,
     _exam_id: input.examId,
   });
   if (error || !data) portalError(error, "الاختبار غير متاح");
 
-  const result = data as Record<string, unknown>;
-  const imagePath = typeof result.imagePath === "string" ? result.imagePath : null;
+  const result = data as unknown as Record<string, unknown>;
+  const imagePath = typeof result["imagePath"] === "string" ? result["imagePath"] : null;
   let imageUrl: string | null = null;
   if (imagePath) {
+    const client = createPortalClient(input.token);
     const { data: signed, error: imageError } = await client.storage
       .from("exam-images")
       .createSignedUrl(imagePath, 60 * 60 * 3);
@@ -61,8 +60,7 @@ export async function submitPortalExam(input: {
   submissionId: string;
   answers: PortalAnswer[];
 }) {
-  const client = createPortalClient(input.token);
-  const { data, error } = await client.rpc("portal_submit_exam", {
+  const { data, error } = await supabase.rpc("portal_submit_exam", {
     _token: input.token,
     _exam_id: input.examId,
     _submission_id: input.submissionId,
@@ -72,12 +70,11 @@ export async function submitPortalExam(input: {
     })) as Json,
   });
   if (error || !data) portalError(error, "تعذر تسليم الاختبار");
-  return data as Record<string, unknown>;
+  return data as unknown as { status?: string; final_score?: number | null };
 }
 
 export async function changePortalPassword(input: { token: string; password: string }) {
-  const client = createPortalClient(input.token);
-  const { error } = await client.rpc("portal_change_password", {
+  const { error } = await supabase.rpc("portal_change_password", {
     _token: input.token,
     _password: input.password,
   });
