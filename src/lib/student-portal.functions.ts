@@ -89,7 +89,7 @@ export const getPortalExam = createServerFn({ method: "POST" })
     if (!assignment) throw new Error("هذا الاختبار غير مخصص للطالب");
     const { data: exam } = await supabaseAdmin
       .from("exams")
-      .select("id, title, kind, max_score, instructions, starts_at, ends_at, publish_status, teacher_id")
+      .select("id, title, kind, max_score, instructions, starts_at, ends_at, publish_status, teacher_id, image_url")
       .eq("id", data.examId)
       .single();
     const now = Date.now();
@@ -118,7 +118,12 @@ export const getPortalExam = createServerFn({ method: "POST" })
       .eq("exam_id", exam.id)
       .order("position");
     if (error) throw error;
-    return { exam, submissionId, questions: questions ?? [] };
+    let imageUrl: string | null = null;
+    if (exam.image_url) {
+      const { data: signed } = await supabaseAdmin.storage.from("exam-images").createSignedUrl(exam.image_url, 60 * 60 * 3);
+      imageUrl = signed?.signedUrl ?? null;
+    }
+    return { exam, submissionId, imageUrl, questions: questions ?? [] };
   });
 
 export const submitPortalExam = createServerFn({ method: "POST" })
