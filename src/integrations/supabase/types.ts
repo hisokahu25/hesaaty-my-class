@@ -316,6 +316,7 @@ export type Database = {
           id: string
           image_url: string | null
           instructions: string
+          is_closed: boolean
           kind: Database["public"]["Enums"]["exam_kind"]
           max_score: number
           publish_status: Database["public"]["Enums"]["exam_publish_status"]
@@ -332,6 +333,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           instructions?: string
+          is_closed?: boolean
           kind?: Database["public"]["Enums"]["exam_kind"]
           max_score?: number
           publish_status?: Database["public"]["Enums"]["exam_publish_status"]
@@ -348,6 +350,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           instructions?: string
+          is_closed?: boolean
           kind?: Database["public"]["Enums"]["exam_kind"]
           max_score?: number
           publish_status?: Database["public"]["Enums"]["exam_publish_status"]
