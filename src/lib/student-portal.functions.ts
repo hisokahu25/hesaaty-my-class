@@ -55,7 +55,7 @@ export const getStudentPortal = createServerFn({ method: "POST" })
     if (examIds.length === 0) return { student, exams: [] };
     const { data: exams, error: examsError } = await supabaseAdmin
       .from("exams")
-      .select("id, title, kind, max_score, instructions, starts_at, ends_at, publish_status")
+      .select("id, title, kind, max_score, instructions, starts_at, ends_at, publish_status, is_closed")
       .in("id", examIds)
       .eq("publish_status", "published")
       .neq("kind", "paper")
@@ -89,12 +89,12 @@ export const getPortalExam = createServerFn({ method: "POST" })
     if (!assignment) throw new Error("هذا الاختبار غير مخصص للطالب");
     const { data: exam } = await supabaseAdmin
       .from("exams")
-      .select("id, title, kind, max_score, instructions, starts_at, ends_at, publish_status, teacher_id, image_url")
+      .select("id, title, kind, max_score, instructions, starts_at, ends_at, publish_status, is_closed, teacher_id, image_url")
       .eq("id", data.examId)
       .single();
     const now = Date.now();
     if (!exam || exam.publish_status !== "published") throw new Error("الاختبار غير منشور");
-    if (!exam.starts_at || !exam.ends_at || now < new Date(exam.starts_at).getTime() || now > new Date(exam.ends_at).getTime()) {
+    if (exam.is_closed || (exam.starts_at && now < new Date(exam.starts_at).getTime()) || (exam.ends_at && now > new Date(exam.ends_at).getTime())) {
       throw new Error("الاختبار غير متاح في الوقت الحالي");
     }
     const { data: existing } = await supabaseAdmin
@@ -139,8 +139,8 @@ export const submitPortalExam = createServerFn({ method: "POST" })
       .select("id, teacher_id, status, exam_id")
       .eq("id", data.submissionId).eq("student_id", studentId).eq("exam_id", data.examId).single();
     if (!submission || submission.status !== "in_progress") throw new Error("لا يمكن تسليم هذا الاختبار");
-    const { data: exam } = await supabaseAdmin.from("exams").select("ends_at").eq("id", data.examId).single();
-    if (!exam?.ends_at || Date.now() > new Date(exam.ends_at).getTime()) throw new Error("انتهى وقت الاختبار");
+    const { data: exam } = await supabaseAdmin.from("exams").select("ends_at, is_closed").eq("id", data.examId).single();
+    if (!exam || exam.is_closed || (exam.ends_at && Date.now() > new Date(exam.ends_at).getTime())) throw new Error("انتهى وقت الاختبار");
     const rows = data.answers.map((answer) => ({
       submission_id: submission.id,
       question_id: answer.questionId,

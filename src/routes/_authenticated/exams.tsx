@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock3, FileText, Pencil, Plus, Send } from "lucide-react";
+import { CheckCircle2, Clock3, FileText, Lock, LockOpen, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, EmptyState, SectionTitle } from "@/components/AppShell";
@@ -69,7 +69,7 @@ function ExamsPage() {
     queryKey: ["digital-exams"],
     queryFn: async () => {
       const { data, error } = await supabase.from("exams")
-        .select("id,title,kind,max_score,publish_status,starts_at,ends_at,created_at")
+        .select("id,title,kind,max_score,publish_status,is_closed,starts_at,ends_at,created_at")
         .in("kind", ["online", "essay"]).order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -153,7 +153,8 @@ function ExamsPage() {
     mutationFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
-      if (!title.trim() || !startsAt || !endsAt) throw new Error("أكمل اسم وموعد الاختبار");
+      if (!title.trim()) throw new Error("أكمل اسم الاختبار");
+      if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) throw new Error("النهاية يجب أن تكون بعد البداية");
       if (!questions.length || questions.some((q) => !q.prompt.trim())) throw new Error("أكمل نصوص الأسئلة");
       if (!groupIds.length && !studentIds.length) throw new Error("اختر مجموعة أو طالبًا واحدًا على الأقل");
       let imagePath: string | null = existingImageUrl;
@@ -166,8 +167,8 @@ function ExamsPage() {
       const total = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
       const examPayload = {
         title: title.trim(), instructions: instructions.trim(),
-        max_score: total, exam_date: startsAt.slice(0, 10), starts_at: new Date(startsAt).toISOString(),
-        ends_at: new Date(endsAt).toISOString(), image_url: imagePath,
+        max_score: total, exam_date: (startsAt || new Date().toISOString()).slice(0, 10), starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+        ends_at: endsAt ? new Date(endsAt).toISOString() : null, image_url: imagePath,
       };
       const writeQuestions = async (examId: string) => {
         const { data: insertedQuestions, error: questionError } = await supabase.from("exam_questions").insert(
@@ -232,6 +233,37 @@ function ExamsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const toggleClosed = useMutation({
+    mutationFn: async ({ id, closed }: { id: string; closed: boolean }) => {
+      const { error } = await supabase.from("exams").update({ is_closed: closed }).eq("id", id);
+      if (error) throw error;
+      return closed;
+    },
+    onSuccess: (closed) => { toast.success(closed ? "تم قفل الاختبار" : "تم فتح الاختبار"); qc.invalidateQueries({ queryKey: ["digital-exams"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteExam = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: subs } = await supabase.from("exam_submissions").select("id").eq("exam_id", id);
+      const subIds = (subs ?? []).map((s) => s.id);
+      if (subIds.length) {
+        const r1 = await supabase.from("exam_answers").delete().in("submission_id", subIds); if (r1.error) throw r1.error;
+        const r2 = await supabase.from("exam_submissions").delete().eq("exam_id", id); if (r2.error) throw r2.error;
+      }
+      const { data: qs } = await supabase.from("exam_questions").select("id").eq("exam_id", id);
+      const qIds = (qs ?? []).map((q) => q.id);
+      if (qIds.length) { const r = await supabase.from("exam_answer_keys").delete().in("question_id", qIds); if (r.error) throw r.error; }
+      for (const t of ["grades", "exam_assignments", "exam_questions"] as const) {
+        const r = await supabase.from(t).delete().eq("exam_id", id); if (r.error) throw r.error;
+      }
+      const { error } = await supabase.from("exams").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("تم حذف الاختبار"); qc.invalidateQueries({ queryKey: ["digital-exams"] }); qc.invalidateQueries({ queryKey: ["exam-submissions"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   async function saveAnswerGrade(answerId: string, points: number, max: number) {
     const { error } = await supabase.from("exam_answers").update({ points_awarded: Math.min(Math.max(points, 0), max) }).eq("id", answerId);
     if (error) toast.error(error.message); else qc.invalidateQueries({ queryKey: ["submission-review", reviewId] });
@@ -272,8 +304,8 @@ function ExamsPage() {
           {!exams.data?.length ? <EmptyState text="لا توجد امتحانات إلكترونية بعد." /> : exams.data.map((exam) => {
             const count = submissions.data?.filter((s) => s.exam_id === exam.id).length ?? 0;
             return <div key={exam.id} className="rounded-lg bg-card p-4 ring-1 ring-border">
-              <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-semibold">{exam.title}</h3><Badge variant={exam.publish_status === "published" ? "default" : "secondary"}>{exam.publish_status === "published" ? "منشور" : "مسودة"}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{exam.kind === "online" ? "اختيار من متعدد وصح/خطأ" : "مقالي"} • {count} إجابة</p></div><div className="flex shrink-0 items-center gap-2"><Button size="sm" variant="outline" onClick={() => openEdit(exam.id)}><Pencil className="size-4" />تعديل</Button>{exam.publish_status === "draft" ? <Button size="sm" onClick={() => publish.mutate(exam.id)} disabled={publish.isPending}><Send className="size-4" />نشر الاختبار</Button> : null}</div></div>
-              <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground"><Clock3 className="size-4" /><span>{exam.starts_at ? new Date(exam.starts_at).toLocaleString("ar-EG") : "—"} — {exam.ends_at ? new Date(exam.ends_at).toLocaleString("ar-EG") : "—"}</span></div>
+              <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-semibold">{exam.title}</h3><Badge variant={exam.publish_status === "published" ? "default" : "secondary"}>{exam.publish_status === "published" ? "منشور" : "مسودة"}</Badge>{exam.is_closed ? <Badge variant="destructive">مغلق</Badge> : null}</div><p className="mt-1 text-xs text-muted-foreground">{exam.kind === "online" ? "اختيار من متعدد وصح/خطأ" : "مقالي"} • {count} إجابة</p></div><div className="flex shrink-0 flex-wrap items-center justify-end gap-2"><Button size="sm" variant="outline" onClick={() => openEdit(exam.id)}><Pencil className="size-4" />تعديل</Button>{exam.publish_status === "draft" ? <Button size="sm" onClick={() => publish.mutate(exam.id)} disabled={publish.isPending}><Send className="size-4" />نشر الاختبار</Button> : null}<Button size="sm" variant="outline" onClick={() => toggleClosed.mutate({ id: exam.id, closed: !exam.is_closed })} disabled={toggleClosed.isPending}>{exam.is_closed ? <><LockOpen className="size-4" />فتح</> : <><Lock className="size-4" />قفل</>}</Button><Button size="sm" variant="ghost" className="text-destructive" aria-label="حذف الاختبار" onClick={() => { if (confirm("حذف الاختبار وكل حلوله ودرجاته نهائيًا؟")) deleteExam.mutate(exam.id); }}><Trash2 className="size-4" /></Button></div></div>
+              <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground"><Clock3 className="size-4" /><span>{!exam.starts_at && !exam.ends_at ? "مفتوح بدون موعد" : `${exam.starts_at ? new Date(exam.starts_at).toLocaleString("ar-EG") : "الآن"} — ${exam.ends_at ? new Date(exam.ends_at).toLocaleString("ar-EG") : "بدون نهاية"}`}</span></div>
             </div>;
           })}
         </TabsContent>
@@ -291,7 +323,7 @@ function ExamsPage() {
         <Field label="اسم الاختبار"><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder="اسم الاختبار" /></Field>
         <Field label="صورة ورقة الاختبار (اختياري)"><div className="grid grid-cols-2 gap-2"><label className="flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-sm">تصوير بالكاميرا<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} /></label><label className="flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-sm">اختيار من المعرض<input type="file" accept="image/*" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} /></label></div>{imageFile ? <img src={URL.createObjectURL(imageFile)} alt="معاينة" className="mt-2 max-h-48 rounded-md ring-1 ring-border" /> : editExamId && editing.data?.imageUrlPreview && existingImageUrl ? <div className="mt-2"><img src={editing.data.imageUrlPreview} alt="الصورة الحالية" className="max-h-48 rounded-md ring-1 ring-border" /><Button size="sm" variant="ghost" className="mt-1" onClick={() => setExistingImageUrl(null)}>إزالة الصورة الحالية</Button></div> : <p className="text-xs text-muted-foreground">صوّر الاختبار الورقي أو ارفع صورته ليظهر للطالب مع الأسئلة.</p>}</Field>
         <Field label="تعليمات الاختبار"><Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} maxLength={1000} /></Field>
-        <div className="grid grid-cols-2 gap-3"><Field label="بداية الاختبار"><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field><Field label="نهاية الاختبار"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field></div>
+        <div className="grid grid-cols-2 gap-3"><Field label="بداية الاختبار (اختياري)"><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field><Field label="نهاية الاختبار (اختياري)"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field></div>
         <div className="grid gap-4 sm:grid-cols-2"><Selection title="تعيين لمجموعات" items={(groups.data ?? []).map((g) => ({ id: g.id, label: g.name }))} selected={groupIds} onToggle={(id) => toggle(groupIds, id, setGroupIds)} /><Selection title="تعيين لطلاب محددين" items={(students.data ?? []).map((s) => ({ id: s.id, label: s.full_name }))} selected={studentIds} onToggle={(id) => toggle(studentIds, id, setStudentIds)} /></div>
         <div className="space-y-3"><div className="flex items-center justify-between"><Label>الأسئلة</Label><Button size="sm" variant="outline" onClick={() => setQuestions((q) => [...q, blankQuestion(kind)])}><Plus className="size-4" />سؤال</Button></div>{questions.map((q, index) => <div key={index} className="space-y-3 rounded-lg bg-secondary p-3"><div className="flex gap-2"><Input value={q.prompt} onChange={(e) => updateQuestion(index, { prompt: e.target.value })} placeholder={`السؤال ${index + 1}`} /><Input className="w-20" type="number" min={1} value={q.points} onChange={(e) => updateQuestion(index, { points: e.target.value })} /><Button size="icon" variant="ghost" className="size-10 shrink-0 text-destructive" aria-label={`حذف السؤال ${index + 1}`} onClick={() => removeQuestion(index)}>×</Button></div>{kind === "online" ? <><select value={q.type} onChange={(e) => updateQuestion(index, { type: e.target.value as Question["type"], options: e.target.value === "true_false" ? ["صح", "خطأ"] : ["", "", "", ""], correct: "0" })} className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"><option value="mcq">اختيار من متعدد</option><option value="true_false">صح أو خطأ</option></select><div className="grid grid-cols-2 gap-2">{q.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-center gap-2"><input type="radio" name={`correct-${editExamId ?? "new"}-${index}`} checked={q.correct === String(optionIndex)} onChange={() => updateQuestion(index, { correct: String(optionIndex) })} /><Input value={option} disabled={q.type === "true_false"} onChange={(e) => updateQuestion(index, { options: q.options.map((item, i) => i === optionIndex ? e.target.value : item) })} placeholder={`اختيار ${optionIndex + 1}`} /></label>)}</div></> : <p className="text-xs text-muted-foreground">سيظهر للطالب حقل كتابة، وتُراجع الإجابة يدويًا.</p>}</div>)}</div>
         <Button className="w-full" disabled={saveExam.isPending} onClick={() => saveExam.mutate()}>{saveExam.isPending ? "جارٍ الحفظ..." : editExamId ? "حفظ التعديلات" : "حفظ كمسودة"}</Button>
