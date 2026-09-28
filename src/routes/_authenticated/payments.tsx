@@ -241,13 +241,19 @@ function PaymentsPage() {
       <SectionTitle
         title="المصروفات"
         aside={
-          <Dialog open={expOpen} onOpenChange={setExpOpen}>
+          <Dialog
+            open={expOpen}
+            onOpenChange={(o) => {
+              setExpOpen(o);
+              if (!o) setExpEditId(null);
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">إضافة مصروف</Button>
             </DialogTrigger>
             <DialogContent dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-right">مصروف جديد</DialogTitle>
+                <DialogTitle className="text-right">{expEditId ? "تعديل المصروف" : "مصروف جديد"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -274,7 +280,7 @@ function PaymentsPage() {
                     <Input type="month" value={expMonth} onChange={(e) => setExpMonth(e.target.value)} />
                   </div>
                 </div>
-                <Button className="w-full" disabled={saveExpense.isPending} onClick={() => saveExpense.mutate()}>حفظ المصروف</Button>
+                <Button className="w-full" disabled={saveExpense.isPending} onClick={() => saveExpense.mutate()}>{expEditId ? "حفظ التعديل" : "حفظ المصروف"}</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -293,7 +299,8 @@ function PaymentsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold tabular-nums text-destructive">{formatMoney(Number(e.amount))}</span>
-                <Button size="sm" variant="ghost" onClick={() => deleteExpense.mutate(e.id)}>حذف</Button>
+                <Button size="sm" variant="ghost" onClick={() => editExpense(e.id)}>تعديل</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteExpense.mutate(e.id)}>حذف</Button>
               </div>
             </div>
           ))}
