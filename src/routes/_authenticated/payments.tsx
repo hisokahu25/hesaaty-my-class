@@ -43,6 +43,7 @@ export const Route = createFileRoute("/_authenticated/payments")({
 function PaymentsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState("");
   const [month, setMonth] = useState(currentMonth());
   const [amountDue, setAmountDue] = useState("0");
@@ -64,6 +65,7 @@ function PaymentsPage() {
   });
 
   const [expOpen, setExpOpen] = useState(false);
+  const [expEditId, setExpEditId] = useState<string | null>(null);
   const [expCategory, setExpCategory] = useState<ExpenseCategory>("rent");
   const [expAmount, setExpAmount] = useState("");
   const [expMonth, setExpMonth] = useState(currentMonth());
@@ -88,24 +90,39 @@ function PaymentsPage() {
       if (!auth.user) throw new Error("انتهت الجلسة");
       const amount = Number(expAmount);
       if (!amount || amount <= 0) throw new Error("أدخل مبلغ المصروف");
-      const { error } = await supabase.from("expenses").insert({
+      const row = {
         teacher_id: auth.user.id,
         category: expCategory,
         amount,
         month: expMonth,
         notes: expCategory === "other" ? expNotes.trim().slice(0, 500) : "",
-      });
+      };
+      const { error } = expEditId
+        ? await supabase.from("expenses").update(row).eq("id", expEditId)
+        : await supabase.from("expenses").insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("تم تسجيل المصروف");
+      toast.success(expEditId ? "تم تعديل المصروف" : "تم تسجيل المصروف");
       setExpOpen(false);
+      setExpEditId(null);
       setExpAmount("");
       setExpNotes("");
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function editExpense(id: string) {
+    const e = (expenses.data ?? []).find((x) => x.id === id);
+    if (!e) return;
+    setExpEditId(id);
+    setExpCategory(e.category as ExpenseCategory);
+    setExpAmount(String(Number(e.amount)));
+    setExpMonth(e.month);
+    setExpNotes(e.notes ?? "");
+    setExpOpen(true);
+  }
 
   const deleteExpense = useMutation({
     mutationFn: async (id: string) => {
@@ -131,19 +148,47 @@ function PaymentsPage() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!studentId) throw new Error("اختر الطالب");
-      const { error } = await supabase.from("payments").insert({
+      const row = {
         teacher_id: auth.user.id,
         student_id: studentId,
         month,
         amount_due: Number(amountDue) || 0,
         amount_paid: Number(amountPaid) || 0,
         paid_at: Number(amountPaid) > 0 ? new Date().toISOString().slice(0, 10) : null,
-      });
+      };
+      const { error } = editId
+        ? await supabase.from("payments").update(row).eq("id", editId)
+        : await supabase.from("payments").insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("تم تسجيل الدفعة");
+      toast.success(editId ? "تم تعديل الدفعة" : "تم تسجيل الدفعة");
       setOpen(false);
+      setEditId(null);
+      queryClient.invalidateQueries({ queryKey: ["payments-list"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function editPayment(id: string) {
+    const p = (payments.data ?? []).find((x) => x.id === id);
+    if (!p) return;
+    setEditId(id);
+    setStudentId(p.student_id);
+    setMonth(p.month);
+    setAmountDue(String(Number(p.amount_due)));
+    setAmountPaid(String(Number(p.amount_paid)));
+    setOpen(true);
+  }
+
+  const deletePayment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("payments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم حذف الدفعة");
       queryClient.invalidateQueries({ queryKey: ["payments-list"] });
       queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
     },
@@ -196,13 +241,19 @@ function PaymentsPage() {
       <SectionTitle
         title="المصروفات"
         aside={
-          <Dialog open={expOpen} onOpenChange={setExpOpen}>
+          <Dialog
+            open={expOpen}
+            onOpenChange={(o) => {
+              setExpOpen(o);
+              if (!o) setExpEditId(null);
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">إضافة مصروف</Button>
             </DialogTrigger>
             <DialogContent dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-right">مصروف جديد</DialogTitle>
+                <DialogTitle className="text-right">{expEditId ? "تعديل المصروف" : "مصروف جديد"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -229,7 +280,7 @@ function PaymentsPage() {
                     <Input type="month" value={expMonth} onChange={(e) => setExpMonth(e.target.value)} />
                   </div>
                 </div>
-                <Button className="w-full" disabled={saveExpense.isPending} onClick={() => saveExpense.mutate()}>حفظ المصروف</Button>
+                <Button className="w-full" disabled={saveExpense.isPending} onClick={() => saveExpense.mutate()}>{expEditId ? "حفظ التعديل" : "حفظ المصروف"}</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -248,7 +299,8 @@ function PaymentsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold tabular-nums text-destructive">{formatMoney(Number(e.amount))}</span>
-                <Button size="sm" variant="ghost" onClick={() => deleteExpense.mutate(e.id)}>حذف</Button>
+                <Button size="sm" variant="ghost" onClick={() => editExpense(e.id)}>تعديل</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteExpense.mutate(e.id)}>حذف</Button>
               </div>
             </div>
           ))}
@@ -258,13 +310,19 @@ function PaymentsPage() {
       <SectionTitle
         title="سجل الدفعات"
         aside={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(o) => {
+              setOpen(o);
+              if (!o) setEditId(null);
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm">تسجيل دفعة</Button>
             </DialogTrigger>
             <DialogContent dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-right">دفعة جديدة</DialogTitle>
+                <DialogTitle className="text-right">{editId ? "تعديل الدفعة" : "دفعة جديدة"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -311,7 +369,7 @@ function PaymentsPage() {
                   disabled={savePayment.isPending}
                   onClick={() => savePayment.mutate()}
                 >
-                  حفظ الدفعة
+                  {editId ? "حفظ التعديل" : "حفظ الدفعة"}
                 </Button>
               </div>
             </DialogContent>
@@ -322,14 +380,16 @@ function PaymentsPage() {
       {(payments.data?.length ?? 0) === 0 ? (
         <EmptyState text="لا توجد دفعات مسجلة بعد." />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-border">
-          <table className="w-full text-right text-sm">
+        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-border">
+          <table className="w-full min-w-[560px] text-right text-sm">
             <thead className="border-b border-border bg-secondary/60">
               <tr>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الشهر</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المستحق</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المدفوع</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المتبقي</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -339,6 +399,7 @@ function PaymentsPage() {
                   <tr key={payment.id}>
                     <td className="px-4 py-3 font-medium">{nameOf(payment.student_id)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{payment.month}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_due))}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_paid))}</td>
                     <td
                       className={`px-4 py-3 font-semibold tabular-nums ${
@@ -346,6 +407,22 @@ function PaymentsPage() {
                       }`}
                     >
                       {formatMoney(rest)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => editPayment(payment.id)}>تعديل</Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={deletePayment.isPending}
+                          onClick={() => {
+                            if (confirm("هل تريد حذف هذه الدفعة؟")) deletePayment.mutate(payment.id);
+                          }}
+                        >
+                          حذف
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
