@@ -2,7 +2,7 @@ name: Sync Fork with Upstream
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,6 +19,8 @@ jobs:
 
       - name: Sync with upstream
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/hisokahunter255/hesaaty-my-class.git
           git fetch upstream
           git checkout main
