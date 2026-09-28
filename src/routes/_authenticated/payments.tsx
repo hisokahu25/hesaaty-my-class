@@ -45,6 +45,7 @@ function PaymentsPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [month, setMonth] = useState(currentMonth());
   const [amountDue, setAmountDue] = useState("0");
   const [amountPaid, setAmountPaid] = useState("0");
@@ -147,29 +148,55 @@ function PaymentsPage() {
     mutationFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
-      if (!studentId) throw new Error("اختر الطالب");
-      const row = {
+      const ids = editId ? (studentId ? [studentId] : []) : selectedIds;
+      if (ids.length === 0) throw new Error("اختر طالبًا واحدًا على الأقل");
+      const base = {
         teacher_id: auth.user.id,
-        student_id: studentId,
         month,
         amount_due: Number(amountDue) || 0,
         amount_paid: Number(amountPaid) || 0,
         paid_at: Number(amountPaid) > 0 ? new Date().toISOString().slice(0, 10) : null,
       };
       const { error } = editId
-        ? await supabase.from("payments").update(row).eq("id", editId)
-        : await supabase.from("payments").insert(row);
+        ? await supabase.from("payments").update({ ...base, student_id: ids[0]! }).eq("id", editId)
+        : await supabase.from("payments").insert(ids.map((id) => ({ ...base, student_id: id })));
       if (error) throw error;
+      return ids.length;
     },
-    onSuccess: () => {
-      toast.success(editId ? "تم تعديل الدفعة" : "تم تسجيل الدفعة");
+    onSuccess: (count) => {
+      toast.success(editId ? "تم تعديل الدفعة" : `تم تسجيل ${count} دفعة`);
       setOpen(false);
       setEditId(null);
+      setSelectedIds([]);
       queryClient.invalidateQueries({ queryKey: ["payments-list"] });
       queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function toggleStudent(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    if (selectedIds.length === 0) {
+      const student = students.data?.find((s) => s.id === id);
+      const group = groups.data?.find((g) => g.id === student?.group_id);
+      if (group) {
+        setAmountDue(String(Number(group.fee)));
+        setAmountPaid(String(Number(group.fee)));
+      }
+    }
+  }
+
+  function selectGroup(groupId: string) {
+    if (!groupId) return;
+    const ids = (students.data ?? []).filter((s) => s.group_id === groupId).map((s) => s.id);
+    if (ids.length === 0) return toast.error("لا يوجد طلاب في هذه المجموعة");
+    setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
+    const group = groups.data?.find((g) => g.id === groupId);
+    if (group) {
+      setAmountDue(String(Number(group.fee)));
+      setAmountPaid(String(Number(group.fee)));
+    }
+  }
 
   function editPayment(id: string) {
     const p = (payments.data ?? []).find((x) => x.id === id);
@@ -314,7 +341,10 @@ function PaymentsPage() {
             open={open}
             onOpenChange={(o) => {
               setOpen(o);
-              if (!o) setEditId(null);
+              if (!o) {
+                setEditId(null);
+                setSelectedIds([]);
+              }
             }}
           >
             <DialogTrigger asChild>
@@ -325,21 +355,63 @@ function PaymentsPage() {
                 <DialogTitle className="text-right">{editId ? "تعديل الدفعة" : "دفعة جديدة"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>الطالب</Label>
-                  <select
-                    value={studentId}
-                    onChange={(e) => pickStudent(e.target.value)}
-                    className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
-                  >
-                    <option value="">اختر الطالب</option>
-                    {(students.data ?? []).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {editId ? (
+                  <div className="space-y-2">
+                    <Label>الطالب</Label>
+                    <select
+                      value={studentId}
+                      onChange={(e) => pickStudent(e.target.value)}
+                      className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
+                    >
+                      <option value="">اختر الطالب</option>
+                      {(students.data ?? []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>تحديد مجموعة كاملة</Label>
+                      <select
+                        value=""
+                        onChange={(e) => selectGroup(e.target.value)}
+                        className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
+                      >
+                        <option value="">اختر مجموعة لإضافة كل طلابها</option>
+                        {(groups.data ?? []).map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>الطلاب ({selectedIds.length} محدد)</Label>
+                        {selectedIds.length > 0 ? (
+                          <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedIds([])}>إلغاء التحديد</Button>
+                        ) : null}
+                      </div>
+                      <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-input p-2">
+                        {(students.data ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground">لا يوجد طلاب</p>
+                        ) : (
+                          (students.data ?? []).map((s) => (
+                            <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-secondary">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(s.id)}
+                                onChange={() => toggleStudent(s.id)}
+                              />
+                              {s.full_name}
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div className="space-y-2">
                   <Label>شهر الاشتراك</Label>
                   <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
