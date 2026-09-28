@@ -7,6 +7,7 @@ import { AppShell, EmptyState, SectionTitle, StatCard } from "@/components/AppSh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { currentMonth, fetchGroups, fetchStudents, formatMoney, type Payment } from "@/lib/db";
+
+type ExpenseCategory = "rent" | "secretary" | "bonus" | "other";
+const EXPENSE_LABEL: Record<ExpenseCategory, string> = {
+  rent: "إيجارات",
+  secretary: "سكرتير",
+  bonus: "مكافآت",
+  other: "مصروفات أخرى",
+};
 
 export const Route = createFileRoute("/_authenticated/payments")({
   head: () => ({
@@ -53,6 +62,69 @@ function PaymentsPage() {
       return (data ?? []) as Payment[];
     },
   });
+
+  const [expOpen, setExpOpen] = useState(false);
+  const [expCategory, setExpCategory] = useState<ExpenseCategory>("rent");
+  const [expAmount, setExpAmount] = useState("");
+  const [expMonth, setExpMonth] = useState(currentMonth());
+  const [expNotes, setExpNotes] = useState("");
+  const [filterMonth, setFilterMonth] = useState(currentMonth());
+
+  const expenses = useQuery({
+    queryKey: ["expenses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("id, category, amount, month, notes, spent_at")
+        .order("spent_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const saveExpense = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("انتهت الجلسة");
+      const amount = Number(expAmount);
+      if (!amount || amount <= 0) throw new Error("أدخل مبلغ المصروف");
+      const { error } = await supabase.from("expenses").insert({
+        teacher_id: auth.user.id,
+        category: expCategory,
+        amount,
+        month: expMonth,
+        notes: expCategory === "other" ? expNotes.trim().slice(0, 500) : "",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم تسجيل المصروف");
+      setExpOpen(false);
+      setExpAmount("");
+      setExpNotes("");
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteExpense = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("expenses").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const inMonth = <T extends { month: string }>(rows: T[]) =>
+    filterMonth ? rows.filter((r) => r.month === filterMonth) : rows;
+  const monthRevenue = inMonth(payments.data ?? []).reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const monthExpenses = inMonth(expenses.data ?? []).reduce((sum, e) => sum + Number(e.amount), 0);
+  const netIncome = monthRevenue - monthExpenses;
+  const byCategory = (Object.keys(EXPENSE_LABEL) as ExpenseCategory[]).map((c) => ({
+    c,
+    total: inMonth(expenses.data ?? []).filter((e) => e.category === c).reduce((s, e) => s + Number(e.amount), 0),
+  }));
 
   const savePayment = useMutation({
     mutationFn: async () => {
@@ -100,6 +172,85 @@ function PaymentsPage() {
         <StatCard label="إجمالي المحصّل" value={`${formatMoney(totalPaid)} ج.م`} tone="success" />
         <StatCard label="إجمالي المتأخرات" value={`${formatMoney(totalDue)} ج.م`} tone="destructive" />
       </section>
+
+      <section className="space-y-3 rounded-xl bg-card p-4 ring-1 ring-border">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">صافي الدخل</h2>
+          <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-40" />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-secondary p-3"><p className="text-xs text-muted-foreground">الإيرادات</p><p className="font-semibold tabular-nums text-primary">{formatMoney(monthRevenue)}</p></div>
+          <div className="rounded-lg bg-secondary p-3"><p className="text-xs text-muted-foreground">المصروفات</p><p className="font-semibold tabular-nums text-destructive">{formatMoney(monthExpenses)}</p></div>
+          <div className="rounded-lg bg-secondary p-3"><p className="text-xs text-muted-foreground">الصافي</p><p className={`font-semibold tabular-nums ${netIncome < 0 ? "text-destructive" : "text-primary"}`}>{formatMoney(netIncome)}</p></div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {byCategory.map(({ c, total }) => (
+            <div key={c} className="flex justify-between rounded-md border border-border px-3 py-2"><span className="text-muted-foreground">{EXPENSE_LABEL[c]}</span><span className="tabular-nums">{formatMoney(total)}</span></div>
+          ))}
+        </div>
+      </section>
+
+      <SectionTitle
+        title="المصروفات"
+        aside={
+          <Dialog open={expOpen} onOpenChange={setExpOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">إضافة مصروف</Button>
+            </DialogTrigger>
+            <DialogContent dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="text-right">مصروف جديد</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>البند</Label>
+                  <select value={expCategory} onChange={(e) => setExpCategory(e.target.value as ExpenseCategory)} className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm">
+                    {(Object.keys(EXPENSE_LABEL) as ExpenseCategory[]).map((c) => (
+                      <option key={c} value={c}>{EXPENSE_LABEL[c]}</option>
+                    ))}
+                  </select>
+                </div>
+                {expCategory === "other" ? (
+                  <div className="space-y-2">
+                    <Label>ملاحظات (اختياري)</Label>
+                    <Textarea value={expNotes} onChange={(e) => setExpNotes(e.target.value)} maxLength={500} placeholder="اكتب تفاصيل المصروف" />
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>المبلغ</Label>
+                    <Input type="number" min={0} value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>الشهر</Label>
+                    <Input type="month" value={expMonth} onChange={(e) => setExpMonth(e.target.value)} />
+                  </div>
+                </div>
+                <Button className="w-full" disabled={saveExpense.isPending} onClick={() => saveExpense.mutate()}>حفظ المصروف</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+      {inMonth(expenses.data ?? []).length === 0 ? (
+        <EmptyState text="لا توجد مصروفات في هذا الشهر." />
+      ) : (
+        <div className="divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-border">
+          {inMonth(expenses.data ?? []).map((e) => (
+            <div key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+              <div>
+                <p className="font-medium">{EXPENSE_LABEL[e.category as ExpenseCategory] ?? e.category}</p>
+                {e.notes ? <p className="text-xs text-muted-foreground">{e.notes}</p> : null}
+                <p className="text-xs text-muted-foreground">{e.month}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold tabular-nums text-destructive">{formatMoney(Number(e.amount))}</span>
+                <Button size="sm" variant="ghost" onClick={() => deleteExpense.mutate(e.id)}>حذف</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <SectionTitle
         title="سجل الدفعات"
