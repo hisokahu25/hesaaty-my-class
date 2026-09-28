@@ -43,6 +43,7 @@ export const Route = createFileRoute("/_authenticated/payments")({
 function PaymentsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState("");
   const [month, setMonth] = useState(currentMonth());
   const [amountDue, setAmountDue] = useState("0");
@@ -64,6 +65,7 @@ function PaymentsPage() {
   });
 
   const [expOpen, setExpOpen] = useState(false);
+  const [expEditId, setExpEditId] = useState<string | null>(null);
   const [expCategory, setExpCategory] = useState<ExpenseCategory>("rent");
   const [expAmount, setExpAmount] = useState("");
   const [expMonth, setExpMonth] = useState(currentMonth());
