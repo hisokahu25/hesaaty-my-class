@@ -189,7 +189,10 @@ function PaymentsPage() {
   function selectGroup(groupId: string) {
     if (!groupId) return;
     const ids = (students.data ?? []).filter((s) => s.group_id === groupId).map((s) => s.id);
-    if (ids.length === 0) return toast.error("لا يوجد طلاب في هذه المجموعة");
+    if (ids.length === 0) {
+      toast.error("لا يوجد طلاب في هذه المجموعة");
+      return;
+    }
     setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
     const group = groups.data?.find((g) => g.id === groupId);
     if (group) {
