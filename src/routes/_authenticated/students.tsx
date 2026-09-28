@@ -96,7 +96,11 @@ function StudentsPage() {
           .single();
         if (error) throw error;
         if (newPassword) {
-          await updatePortalPassword({ data: { studentId: student.id, password: newPassword } });
+          try {
+            await updatePortalPassword({ data: { studentId: student.id, password: newPassword } });
+          } catch (e) {
+            toast.warning(`تمت إضافة الطالب، لكن تعذر حفظ كلمة المرور: ${(e as Error).message}`);
+          }
         }
       }
     },
@@ -188,7 +192,7 @@ function StudentsPage() {
             {!editingId ? (
               <div className="space-y-2">
                 <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
-                <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="اختياري — الافتراضي آخر ٤ أرقام من هاتف ولي الأمر" />
+                <Input type="password" autoComplete="new-password" name="portal-password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="اختياري — الافتراضي آخر ٤ أرقام من هاتف ولي الأمر" />
               </div>
             ) : null}
 
@@ -204,7 +208,7 @@ function StudentsPage() {
               <div className="space-y-2 rounded-lg bg-secondary p-3">
                 <Label>كلمة مرور بوابة الطالب وولي الأمر</Label>
                 <div className="flex gap-2">
-                  <Input type="password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="كلمة مرور جديدة" />
+                  <Input type="password" autoComplete="new-password" name="portal-password" dir="ltr" minLength={4} maxLength={72} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="كلمة مرور جديدة" />
                   <Button type="button" variant="outline" disabled={newPassword.length < 4 || passwordMutation.isPending} onClick={() => passwordMutation.mutate()}>تغيير</Button>
                 </div>
               </div>

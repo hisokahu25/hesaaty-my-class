@@ -172,7 +172,8 @@ export const setStudentPortalPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ studentId: z.string().uuid(), password: z.string().min(4).max(72) }).parse(input))
   .handler(async ({ data, context }) => {
-    const { data: student } = await context.supabase.from("students").select("id").eq("id", data.studentId).maybeSingle();
+    const { data: student, error: lookupError } = await context.supabase.from("students").select("id").eq("id", data.studentId).maybeSingle();
+    if (lookupError) throw new Error(`تعذر الاتصال بقاعدة البيانات من الخادم: ${lookupError.message}`);
     if (!student) throw new Error("الطالب غير موجود أو غير مصرح لك");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.rpc("service_set_student_portal_password", { _student_id: data.studentId, _password: data.password });
