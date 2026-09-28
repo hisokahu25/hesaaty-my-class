@@ -7,6 +7,7 @@ import { AppShell, EmptyState, SectionTitle, StatCard } from "@/components/AppSh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { currentMonth, fetchGroups, fetchStudents, formatMoney, type Payment } from "@/lib/db";
+
+type ExpenseCategory = "rent" | "secretary" | "bonus" | "other";
+const EXPENSE_LABEL: Record<ExpenseCategory, string> = {
+  rent: "إيجارات",
+  secretary: "سكرتير",
+  bonus: "مكافآت",
+  other: "مصروفات أخرى",
+};
 
 export const Route = createFileRoute("/_authenticated/payments")({
   head: () => ({
@@ -34,6 +43,7 @@ export const Route = createFileRoute("/_authenticated/payments")({
 function PaymentsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState("");
   const [month, setMonth] = useState(currentMonth());
   const [amountDue, setAmountDue] = useState("0");
@@ -54,24 +64,131 @@ function PaymentsPage() {
     },
   });
 
+  const [expOpen, setExpOpen] = useState(false);
+  const [expEditId, setExpEditId] = useState<string | null>(null);
+  const [expCategory, setExpCategory] = useState<ExpenseCategory>("rent");
+  const [expAmount, setExpAmount] = useState("");
+  const [expMonth, setExpMonth] = useState(currentMonth());
+  const [expNotes, setExpNotes] = useState("");
+  const [filterMonth, setFilterMonth] = useState(currentMonth());
+
+  const expenses = useQuery({
+    queryKey: ["expenses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("id, category, amount, month, notes, spent_at")
+        .order("spent_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const saveExpense = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("انتهت الجلسة");
+      const amount = Number(expAmount);
+      if (!amount || amount <= 0) throw new Error("أدخل مبلغ المصروف");
+      const row = {
+        teacher_id: auth.user.id,
+        category: expCategory,
+        amount,
+        month: expMonth,
+        notes: expCategory === "other" ? expNotes.trim().slice(0, 500) : "",
+      };
+      const { error } = expEditId
+        ? await supabase.from("expenses").update(row).eq("id", expEditId)
+        : await supabase.from("expenses").insert(row);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(expEditId ? "تم تعديل المصروف" : "تم تسجيل المصروف");
+      setExpOpen(false);
+      setExpEditId(null);
+      setExpAmount("");
+      setExpNotes("");
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function editExpense(id: string) {
+    const e = (expenses.data ?? []).find((x) => x.id === id);
+    if (!e) return;
+    setExpEditId(id);
+    setExpCategory(e.category as ExpenseCategory);
+    setExpAmount(String(Number(e.amount)));
+    setExpMonth(e.month);
+    setExpNotes(e.notes ?? "");
+    setExpOpen(true);
+  }
+
+  const deleteExpense = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("expenses").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const inMonth = <T extends { month: string }>(rows: T[]) =>
+    filterMonth ? rows.filter((r) => r.month === filterMonth) : rows;
+  const monthRevenue = inMonth(payments.data ?? []).reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const monthExpenses = inMonth(expenses.data ?? []).reduce((sum, e) => sum + Number(e.amount), 0);
+  const netIncome = monthRevenue - monthExpenses;
+  const byCategory = (Object.keys(EXPENSE_LABEL) as ExpenseCategory[]).map((c) => ({
+    c,
+    total: inMonth(expenses.data ?? []).filter((e) => e.category === c).reduce((s, e) => s + Number(e.amount), 0),
+  }));
+
   const savePayment = useMutation({
     mutationFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!studentId) throw new Error("اختر الطالب");
-      const { error } = await supabase.from("payments").insert({
+      const row = {
         teacher_id: auth.user.id,
         student_id: studentId,
         month,
         amount_due: Number(amountDue) || 0,
         amount_paid: Number(amountPaid) || 0,
         paid_at: Number(amountPaid) > 0 ? new Date().toISOString().slice(0, 10) : null,
-      });
+      };
+      const { error } = editId
+        ? await supabase.from("payments").update(row).eq("id", editId)
+        : await supabase.from("payments").insert(row);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("تم تسجيل الدفعة");
+      toast.success(editId ? "تم تعديل الدفعة" : "تم تسجيل الدفعة");
       setOpen(false);
+      setEditId(null);
+      queryClient.invalidateQueries({ queryKey: ["payments-list"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function editPayment(id: string) {
+    const p = (payments.data ?? []).find((x) => x.id === id);
+    if (!p) return;
+    setEditId(id);
+    setStudentId(p.student_id);
+    setMonth(p.month);
+    setAmountDue(String(Number(p.amount_due)));
+    setAmountPaid(String(Number(p.amount_paid)));
+    setOpen(true);
+  }
+
+  const deletePayment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("payments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم حذف الدفعة");
       queryClient.invalidateQueries({ queryKey: ["payments-list"] });
       queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
     },
@@ -91,7 +208,10 @@ function PaymentsPage() {
     setStudentId(id);
     const student = students.data?.find((s) => s.id === id);
     const group = groups.data?.find((g) => g.id === student?.group_id);
-    if (group) setAmountDue(String(Number(group.fee)));
+    if (group) {
+      setAmountDue(String(Number(group.fee)));
+      setAmountPaid(String(Number(group.fee)));
+    }
   }
 
   return (
@@ -101,16 +221,108 @@ function PaymentsPage() {
         <StatCard label="إجمالي المتأخرات" value={`${formatMoney(totalDue)} ج.م`} tone="destructive" />
       </section>
 
+      <section className="space-y-3 rounded-xl bg-card p-4 ring-1 ring-border">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">صافي الدخل</h2>
+          <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-40" />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-secondary p-3"><p className="text-xs text-muted-foreground">الإيرادات</p><p className="font-semibold tabular-nums text-primary">{formatMoney(monthRevenue)}</p></div>
+          <div className="rounded-lg bg-secondary p-3"><p className="text-xs text-muted-foreground">المصروفات</p><p className="font-semibold tabular-nums text-destructive">{formatMoney(monthExpenses)}</p></div>
+          <div className="rounded-lg bg-secondary p-3"><p className="text-xs text-muted-foreground">الصافي</p><p className={`font-semibold tabular-nums ${netIncome < 0 ? "text-destructive" : "text-primary"}`}>{formatMoney(netIncome)}</p></div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {byCategory.map(({ c, total }) => (
+            <div key={c} className="flex justify-between rounded-md border border-border px-3 py-2"><span className="text-muted-foreground">{EXPENSE_LABEL[c]}</span><span className="tabular-nums">{formatMoney(total)}</span></div>
+          ))}
+        </div>
+      </section>
+
+      <SectionTitle
+        title="المصروفات"
+        aside={
+          <Dialog
+            open={expOpen}
+            onOpenChange={(o) => {
+              setExpOpen(o);
+              if (!o) setExpEditId(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">إضافة مصروف</Button>
+            </DialogTrigger>
+            <DialogContent dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="text-right">{expEditId ? "تعديل المصروف" : "مصروف جديد"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>البند</Label>
+                  <select value={expCategory} onChange={(e) => setExpCategory(e.target.value as ExpenseCategory)} className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm">
+                    {(Object.keys(EXPENSE_LABEL) as ExpenseCategory[]).map((c) => (
+                      <option key={c} value={c}>{EXPENSE_LABEL[c]}</option>
+                    ))}
+                  </select>
+                </div>
+                {expCategory === "other" ? (
+                  <div className="space-y-2">
+                    <Label>ملاحظات (اختياري)</Label>
+                    <Textarea value={expNotes} onChange={(e) => setExpNotes(e.target.value)} maxLength={500} placeholder="اكتب تفاصيل المصروف" />
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>المبلغ</Label>
+                    <Input type="number" min={0} value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>الشهر</Label>
+                    <Input type="month" value={expMonth} onChange={(e) => setExpMonth(e.target.value)} />
+                  </div>
+                </div>
+                <Button className="w-full" disabled={saveExpense.isPending} onClick={() => saveExpense.mutate()}>{expEditId ? "حفظ التعديل" : "حفظ المصروف"}</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+      {inMonth(expenses.data ?? []).length === 0 ? (
+        <EmptyState text="لا توجد مصروفات في هذا الشهر." />
+      ) : (
+        <div className="divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-border">
+          {inMonth(expenses.data ?? []).map((e) => (
+            <div key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+              <div>
+                <p className="font-medium">{EXPENSE_LABEL[e.category as ExpenseCategory] ?? e.category}</p>
+                {e.notes ? <p className="text-xs text-muted-foreground">{e.notes}</p> : null}
+                <p className="text-xs text-muted-foreground">{e.month}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold tabular-nums text-destructive">{formatMoney(Number(e.amount))}</span>
+                <Button size="sm" variant="ghost" onClick={() => editExpense(e.id)}>تعديل</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteExpense.mutate(e.id)}>حذف</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <SectionTitle
         title="سجل الدفعات"
         aside={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(o) => {
+              setOpen(o);
+              if (!o) setEditId(null);
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm">تسجيل دفعة</Button>
             </DialogTrigger>
             <DialogContent dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-right">دفعة جديدة</DialogTitle>
+                <DialogTitle className="text-right">{editId ? "تعديل الدفعة" : "دفعة جديدة"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -157,7 +369,7 @@ function PaymentsPage() {
                   disabled={savePayment.isPending}
                   onClick={() => savePayment.mutate()}
                 >
-                  حفظ الدفعة
+                  {editId ? "حفظ التعديل" : "حفظ الدفعة"}
                 </Button>
               </div>
             </DialogContent>
@@ -168,14 +380,16 @@ function PaymentsPage() {
       {(payments.data?.length ?? 0) === 0 ? (
         <EmptyState text="لا توجد دفعات مسجلة بعد." />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-border">
-          <table className="w-full text-right text-sm">
+        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-border">
+          <table className="w-full min-w-[560px] text-right text-sm">
             <thead className="border-b border-border bg-secondary/60">
               <tr>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الشهر</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المستحق</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المدفوع</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المتبقي</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -185,6 +399,7 @@ function PaymentsPage() {
                   <tr key={payment.id}>
                     <td className="px-4 py-3 font-medium">{nameOf(payment.student_id)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{payment.month}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_due))}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_paid))}</td>
                     <td
                       className={`px-4 py-3 font-semibold tabular-nums ${
@@ -192,6 +407,22 @@ function PaymentsPage() {
                       }`}
                     >
                       {formatMoney(rest)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => editPayment(payment.id)}>تعديل</Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={deletePayment.isPending}
+                          onClick={() => {
+                            if (confirm("هل تريد حذف هذه الدفعة؟")) deletePayment.mutate(payment.id);
+                          }}
+                        >
+                          حذف
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );

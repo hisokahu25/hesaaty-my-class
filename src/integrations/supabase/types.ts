@@ -314,6 +314,7 @@ export type Database = {
           exam_date: string
           group_id: string | null
           id: string
+          image_url: string | null
           instructions: string
           kind: Database["public"]["Enums"]["exam_kind"]
           max_score: number
@@ -329,6 +330,7 @@ export type Database = {
           exam_date?: string
           group_id?: string | null
           id?: string
+          image_url?: string | null
           instructions?: string
           kind?: Database["public"]["Enums"]["exam_kind"]
           max_score?: number
@@ -344,6 +346,7 @@ export type Database = {
           exam_date?: string
           group_id?: string | null
           id?: string
+          image_url?: string | null
           instructions?: string
           kind?: Database["public"]["Enums"]["exam_kind"]
           max_score?: number
@@ -362,6 +365,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          id: string
+          month: string
+          notes: string
+          spent_at: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          id?: string
+          month: string
+          notes?: string
+          spent_at?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          id?: string
+          month?: string
+          notes?: string
+          spent_at?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       grades: {
         Row: {

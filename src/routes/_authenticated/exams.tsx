@@ -51,6 +51,7 @@ function ExamsPage() {
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [questions, setQuestions] = useState<Question[]>([blankQuestion("online")]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [reviewId, setReviewId] = useState<string | null>(null);
 
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
@@ -92,11 +93,18 @@ function ExamsPage() {
       if (!title.trim() || !startsAt || !endsAt) throw new Error("أكمل اسم وموعد الاختبار");
       if (!questions.length || questions.some((q) => !q.prompt.trim())) throw new Error("أكمل نصوص الأسئلة");
       if (!groupIds.length && !studentIds.length) throw new Error("اختر مجموعة أو طالبًا واحدًا على الأقل");
+      let imagePath: string | null = null;
+      if (imageFile) {
+        if (!imageFile.type.startsWith("image/")) throw new Error("الملف يجب أن يكون صورة");
+        imagePath = `${auth.user.id}/${crypto.randomUUID()}.${imageFile.name.split(".").pop() || "jpg"}`;
+        const { error: upErr } = await supabase.storage.from("exam-images").upload(imagePath, imageFile, { contentType: imageFile.type });
+        if (upErr) throw upErr;
+      }
       const total = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
       const { data: exam, error } = await supabase.from("exams").insert({
         teacher_id: auth.user.id, title: title.trim(), kind, instructions: instructions.trim(),
         max_score: total, exam_date: startsAt.slice(0, 10), starts_at: new Date(startsAt).toISOString(),
-        ends_at: new Date(endsAt).toISOString(), publish_status: "draft",
+        ends_at: new Date(endsAt).toISOString(), publish_status: "draft", image_url: imagePath,
       }).select("id").single();
       if (error) throw error;
       const { data: insertedQuestions, error: questionError } = await supabase.from("exam_questions").insert(
@@ -122,7 +130,7 @@ function ExamsPage() {
     },
     onSuccess: () => {
       toast.success("تم حفظ الاختبار كمسودة"); setOpen(false); setTitle(""); setInstructions("");
-      setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion(kind)]); qc.invalidateQueries({ queryKey: ["digital-exams"] });
+      setImageFile(null); setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion(kind)]); qc.invalidateQueries({ queryKey: ["digital-exams"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -175,6 +183,7 @@ function ExamsPage() {
       <Dialog open={open} onOpenChange={setOpen}><DialogContent dir="rtl" className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle className="text-right">إنشاء اختبار جديد</DialogTitle></DialogHeader><div className="space-y-5">
         <div className="grid grid-cols-2 gap-2"><Button variant={kind === "online" ? "default" : "outline"} onClick={() => changeKind("online")}>اختيار وصح/خطأ</Button><Button variant={kind === "essay" ? "default" : "outline"} onClick={() => changeKind("essay")}>مقالي</Button></div>
         <Field label="اسم الاختبار"><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} /></Field>
+        <Field label="صورة ورقة الاختبار (اختياري)"><div className="grid grid-cols-2 gap-2"><label className="flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-sm">تصوير بالكاميرا<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} /></label><label className="flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-sm">اختيار من المعرض<input type="file" accept="image/*" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} /></label></div>{imageFile ? <img src={URL.createObjectURL(imageFile)} alt="معاينة" className="mt-2 max-h-48 rounded-md ring-1 ring-border" /> : <p className="text-xs text-muted-foreground">صوّر الاختبار الورقي أو ارفع صورته ليظهر للطالب مع الأسئلة.</p>}</Field>
         <Field label="تعليمات الاختبار"><Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} maxLength={1000} /></Field>
         <div className="grid grid-cols-2 gap-3"><Field label="بداية الاختبار"><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field><Field label="نهاية الاختبار"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field></div>
         <div className="grid gap-4 sm:grid-cols-2"><Selection title="تعيين لمجموعات" items={(groups.data ?? []).map((g) => ({ id: g.id, label: g.name }))} selected={groupIds} onToggle={(id) => toggle(groupIds, id, setGroupIds)} /><Selection title="تعيين لطلاب محددين" items={(students.data ?? []).map((s) => ({ id: s.id, label: s.full_name }))} selected={studentIds} onToggle={(id) => toggle(studentIds, id, setStudentIds)} /></div>
