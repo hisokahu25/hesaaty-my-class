@@ -310,13 +310,19 @@ function PaymentsPage() {
       <SectionTitle
         title="سجل الدفعات"
         aside={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(o) => {
+              setOpen(o);
+              if (!o) setEditId(null);
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm">تسجيل دفعة</Button>
             </DialogTrigger>
             <DialogContent dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-right">دفعة جديدة</DialogTitle>
+                <DialogTitle className="text-right">{editId ? "تعديل الدفعة" : "دفعة جديدة"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -363,7 +369,7 @@ function PaymentsPage() {
                   disabled={savePayment.isPending}
                   onClick={() => savePayment.mutate()}
                 >
-                  حفظ الدفعة
+                  {editId ? "حفظ التعديل" : "حفظ الدفعة"}
                 </Button>
               </div>
             </DialogContent>
@@ -380,8 +386,10 @@ function PaymentsPage() {
               <tr>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الشهر</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المستحق</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المدفوع</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المتبقي</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -391,6 +399,7 @@ function PaymentsPage() {
                   <tr key={payment.id}>
                     <td className="px-4 py-3 font-medium">{nameOf(payment.student_id)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{payment.month}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_due))}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_paid))}</td>
                     <td
                       className={`px-4 py-3 font-semibold tabular-nums ${
@@ -398,6 +407,22 @@ function PaymentsPage() {
                       }`}
                     >
                       {formatMoney(rest)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => editPayment(payment.id)}>تعديل</Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={deletePayment.isPending}
+                          onClick={() => {
+                            if (confirm("هل تريد حذف هذه الدفعة؟")) deletePayment.mutate(payment.id);
+                          }}
+                        >
+                          حذف
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
