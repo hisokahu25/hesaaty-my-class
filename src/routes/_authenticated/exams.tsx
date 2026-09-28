@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock3, FileText, Pencil, Plus, Send } from "lucide-react";
+import { CheckCircle2, Clock3, FileText, Lock, LockOpen, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, EmptyState, SectionTitle } from "@/components/AppShell";
@@ -230,6 +230,37 @@ function ExamsPage() {
       if (error) throw error;
     },
     onSuccess: () => { toast.success("تم نشر الاختبار"); qc.invalidateQueries({ queryKey: ["digital-exams"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleClosed = useMutation({
+    mutationFn: async ({ id, closed }: { id: string; closed: boolean }) => {
+      const { error } = await supabase.from("exams").update({ is_closed: closed }).eq("id", id);
+      if (error) throw error;
+      return closed;
+    },
+    onSuccess: (closed) => { toast.success(closed ? "تم قفل الاختبار" : "تم فتح الاختبار"); qc.invalidateQueries({ queryKey: ["digital-exams"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteExam = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: subs } = await supabase.from("exam_submissions").select("id").eq("exam_id", id);
+      const subIds = (subs ?? []).map((s) => s.id);
+      if (subIds.length) {
+        const r1 = await supabase.from("exam_answers").delete().in("submission_id", subIds); if (r1.error) throw r1.error;
+        const r2 = await supabase.from("exam_submissions").delete().eq("exam_id", id); if (r2.error) throw r2.error;
+      }
+      const { data: qs } = await supabase.from("exam_questions").select("id").eq("exam_id", id);
+      const qIds = (qs ?? []).map((q) => q.id);
+      if (qIds.length) { const r = await supabase.from("exam_answer_keys").delete().in("question_id", qIds); if (r.error) throw r.error; }
+      for (const t of ["grades", "exam_assignments", "exam_questions"] as const) {
+        const r = await supabase.from(t).delete().eq("exam_id", id); if (r.error) throw r.error;
+      }
+      const { error } = await supabase.from("exams").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("تم حذف الاختبار"); qc.invalidateQueries({ queryKey: ["digital-exams"] }); qc.invalidateQueries({ queryKey: ["exam-submissions"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
