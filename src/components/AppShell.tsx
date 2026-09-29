@@ -1,16 +1,17 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, BarChart3, CreditCard, Home, LogOut, CalendarDays, Users, User, ClipboardList } from "lucide-react";
+import { Bell, BarChart3, CreditCard, Home, LogOut, CalendarDays, Users, User, ClipboardList, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { canAccess, homeForRole, useMyRole } from "@/lib/roles";
+import { canAccess, homeForRole, useMyApproval, useMyRole } from "@/lib/roles";
 
 const NAV = [
+  { to: "/admin", label: "الاشتراكات", icon: ShieldCheck },
   { to: "/dashboard", label: "الرئيسية", icon: Home },
   { to: "/students", label: "الطلاب", icon: Users },
   { to: "/groups", label: "الجدول", icon: CalendarDays },
   { to: "/grades", label: "الدرجات", icon: Bell },
-  { to: "/exams", label: "الامتحانات", icon: ClipboardList },
+  { to: "/exams", label: "الامتحانات", icon: ClipboardList, ShieldCheck },
   { to: "/payments", label: "المالية", icon: CreditCard },
   { to: "/stats", label: "الإحصائيات", icon: BarChart3 },
 ] as const;
@@ -27,6 +28,7 @@ export function AppShell({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const role = useMyRole();
+  const approval = useMyApproval();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const nav = NAV.filter((item) => (role.data ? canAccess(role.data, item.to) : false));
@@ -78,7 +80,18 @@ export function AppShell({
       </nav>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        {allowed === false ? (
+        {approval.data && approval.data !== "approved" ? (
+          <div className="rounded-xl bg-card p-6 text-center shadow-sm ring-1 ring-border">
+            <h2 className="text-lg font-semibold">
+              {approval.data === "rejected" ? "تم رفض طلب الاشتراك" : "حسابك قيد المراجعة"}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {approval.data === "rejected"
+                ? "للاستفسار تواصل مع إدارة الموقع: Hisoka.hunter25@gmail.com"
+                : "سيتم تفعيل حسابك بعد موافقة مدير الموقع. للتسريع راسل: Hisoka.hunter25@gmail.com"}
+            </p>
+          </div>
+        ) : allowed === false ? (
           <div className="rounded-xl bg-card p-6 text-center shadow-sm ring-1 ring-border">
             <h2 className="text-lg font-semibold">غير مصرح لك بالدخول</h2>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -98,7 +111,7 @@ export function AppShell({
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-6 py-3">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          {nav.map(({ to, label, icon: Icon }) => (
+          {(approval.data === "approved" ? nav : []).map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}

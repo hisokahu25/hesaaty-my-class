@@ -49,6 +49,7 @@ function PaymentsPage() {
   const [month, setMonth] = useState(currentMonth());
   const [amountDue, setAmountDue] = useState("0");
   const [amountPaid, setAmountPaid] = useState("0");
+  const [discount, setDiscount] = useState("0");
 
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
@@ -58,7 +59,7 @@ function PaymentsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
-        .select("id, student_id, month, amount_due, amount_paid, paid_at")
+        .select("id, student_id, month, amount_due, amount_paid, discount, paid_at")
         .order("month", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Payment[];
@@ -155,6 +156,7 @@ function PaymentsPage() {
         month,
         amount_due: Number(amountDue) || 0,
         amount_paid: Number(amountPaid) || 0,
+        discount: Math.max(Number(discount) || 0, 0),
         paid_at: Number(amountPaid) > 0 ? new Date().toISOString().slice(0, 10) : null,
       };
       const { error } = editId
@@ -168,6 +170,7 @@ function PaymentsPage() {
       setOpen(false);
       setEditId(null);
       setSelectedIds([]);
+      setDiscount("0");
       queryClient.invalidateQueries({ queryKey: ["payments-list"] });
       queryClient.invalidateQueries({ queryKey: ["payments", currentMonth()] });
     },
@@ -209,6 +212,7 @@ function PaymentsPage() {
     setMonth(p.month);
     setAmountDue(String(Number(p.amount_due)));
     setAmountPaid(String(Number(p.amount_paid)));
+    setDiscount(String(Number(p.discount ?? 0)));
     setOpen(true);
   }
 
@@ -229,7 +233,8 @@ function PaymentsPage() {
     students.data?.find((s) => s.id === id)?.full_name ?? "طالب محذوف";
 
   const totalDue = (payments.data ?? []).reduce(
-    (sum, p) => sum + Math.max(Number(p.amount_due) - Number(p.amount_paid), 0),
+    (sum, p) =>
+      sum + Math.max(Number(p.amount_due) - Number(p.discount ?? 0) - Number(p.amount_paid), 0),
     0,
   );
   const totalPaid = (payments.data ?? []).reduce((sum, p) => sum + Number(p.amount_paid), 0);
@@ -419,7 +424,7 @@ function PaymentsPage() {
                   <Label>شهر الاشتراك</Label>
                   <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>قيمة الاشتراك</Label>
                     <Input
@@ -427,6 +432,20 @@ function PaymentsPage() {
                       min={0}
                       value={amountDue}
                       onChange={(e) => setAmountDue(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>الخصم</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={discount}
+                      onChange={(e) => {
+                        setDiscount(e.target.value);
+                        setAmountPaid(
+                          String(Math.max((Number(amountDue) || 0) - (Number(e.target.value) || 0), 0)),
+                        );
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -439,6 +458,18 @@ function PaymentsPage() {
                     />
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  المطلوب بعد الخصم:{" "}
+                  {formatMoney(Math.max((Number(amountDue) || 0) - (Number(discount) || 0), 0))} ج.م •
+                  المتبقي:{" "}
+                  {formatMoney(
+                    Math.max(
+                      (Number(amountDue) || 0) - (Number(discount) || 0) - (Number(amountPaid) || 0),
+                      0,
+                    ),
+                  )}{" "}
+                  ج.م
+                </p>
                 <Button
                   className="w-full"
                   disabled={savePayment.isPending}
@@ -456,12 +487,13 @@ function PaymentsPage() {
         <EmptyState text="لا توجد دفعات مسجلة بعد." />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-border">
-          <table className="w-full min-w-[560px] text-right text-sm">
+          <table className="w-full min-w-[640px] text-right text-sm">
             <thead className="border-b border-border bg-secondary/60">
               <tr>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الشهر</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المستحق</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الخصم</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المدفوع</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المتبقي</th>
                 <th className="px-4 py-3 text-xs font-semibold text-muted-foreground"></th>
@@ -469,12 +501,16 @@ function PaymentsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {(payments.data ?? []).map((payment) => {
-                const rest = Math.max(Number(payment.amount_due) - Number(payment.amount_paid), 0);
+                const rest = Math.max(
+                  Number(payment.amount_due) - Number(payment.discount ?? 0) - Number(payment.amount_paid),
+                  0,
+                );
                 return (
                   <tr key={payment.id}>
                     <td className="px-4 py-3 font-medium">{nameOf(payment.student_id)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{payment.month}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_due))}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.discount ?? 0))}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_paid))}</td>
                     <td
                       className={`px-4 py-3 font-semibold tabular-nums ${
