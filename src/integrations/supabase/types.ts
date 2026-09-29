@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_approvals: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          reviewed_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          reviewed_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          reviewed_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           created_at: string
@@ -725,6 +755,7 @@ export type Database = {
         Args: { _password: string; _student_code: string }
         Returns: string
       }
+      claim_owner_admin: { Args: never; Returns: boolean }
       finalize_essay_submission: {
         Args: { _submission_id: string }
         Returns: undefined
