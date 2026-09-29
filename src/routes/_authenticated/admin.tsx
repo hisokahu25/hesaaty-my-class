@@ -46,6 +46,17 @@ function AdminPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const removeUser = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("admin_delete_user" as never, { _user_id: id } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم حذف الحساب");
+      qc.invalidateQueries({ queryKey: ["account-approvals"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const rows = list.data ?? [];
   const count = (s: ApprovalStatus) => rows.filter((r) => r.status === s).length;
 
@@ -79,6 +90,16 @@ function AdminPage() {
                     {r.status === "approved" ? "إيقاف" : "رفض"}
                   </Button>
                 ) : null}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={removeUser.isPending}
+                  onClick={() => {
+                    if (confirm(`حذف الحساب ${r.email} نهائيًا مع كل بياناته؟ لا يمكن التراجع.`)) removeUser.mutate(r.user_id);
+                  }}
+                >
+                  حذف
+                </Button>
               </div>
             </div>
           ))}
