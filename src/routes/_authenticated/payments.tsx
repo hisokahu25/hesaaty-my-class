@@ -486,61 +486,78 @@ function PaymentsPage() {
       {(payments.data?.length ?? 0) === 0 ? (
         <EmptyState text="لا توجد دفعات مسجلة بعد." />
       ) : (
-        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-border">
-          <table className="w-full min-w-[640px] text-right text-sm">
-            <thead className="border-b border-border bg-secondary/60">
-              <tr>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الشهر</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المستحق</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الخصم</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المدفوع</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المتبقي</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {(payments.data ?? []).map((payment) => {
-                const rest = Math.max(
-                  Number(payment.amount_due) - Number(payment.discount ?? 0) - Number(payment.amount_paid),
-                  0,
-                );
-                return (
-                  <tr key={payment.id}>
-                    <td className="px-4 py-3 font-medium">{nameOf(payment.student_id)}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{payment.month}</td>
-                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_due))}</td>
-                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.discount ?? 0))}</td>
-                    <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_paid))}</td>
-                    <td
-                      className={`px-4 py-3 font-semibold tabular-nums ${
-                        rest > 0 ? "text-destructive" : "text-primary"
-                      }`}
-                    >
-                      {formatMoney(rest)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => editPayment(payment.id)}>تعديل</Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive"
-                          disabled={deletePayment.isPending}
-                          onClick={() => {
-                            if (confirm("هل تريد حذف هذه الدفعة؟")) deletePayment.mutate(payment.id);
-                          }}
-                        >
-                          حذف
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        (() => {
+          const restOf = (p: { amount_due: number; discount?: number; amount_paid: number }) =>
+            Math.max(Number(p.amount_due) - Number(p.discount ?? 0) - Number(p.amount_paid), 0);
+          const all = payments.data ?? [];
+          const pending = all.filter((p) => restOf(p) > 0);
+          const settled = all.filter((p) => restOf(p) <= 0);
+          const renderTable = (list: typeof all, emptyText: string) =>
+            list.length === 0 ? (
+              <EmptyState text={emptyText} />
+            ) : (
+              <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-border">
+                <table className="w-full min-w-[640px] text-right text-sm">
+                  <thead className="border-b border-border bg-secondary/60">
+                    <tr>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الطالب</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الشهر</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المستحق</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">الخصم</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المدفوع</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">المتبقي</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-muted-foreground"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {list.map((payment) => {
+                      const rest = restOf(payment);
+                      return (
+                        <tr key={payment.id}>
+                          <td className="px-4 py-3 font-medium">{nameOf(payment.student_id)}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{payment.month}</td>
+                          <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_due))}</td>
+                          <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.discount ?? 0))}</td>
+                          <td className="px-4 py-3 tabular-nums">{formatMoney(Number(payment.amount_paid))}</td>
+                          <td className={`px-4 py-3 font-semibold tabular-nums ${rest > 0 ? "text-destructive" : "text-primary"}`}>
+                            {formatMoney(rest)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => editPayment(payment.id)}>تعديل</Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive"
+                                disabled={deletePayment.isPending}
+                                onClick={() => {
+                                  if (confirm("هل تريد حذف هذه الدفعة؟")) deletePayment.mutate(payment.id);
+                                }}
+                              >
+                                حذف
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          return (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-destructive">تحت السداد ({formatMoney(pending.length)})</h3>
+                {renderTable(pending, "لا يوجد طلاب عليهم مبالغ متبقية.")}
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-primary">المسددون ({formatMoney(settled.length)})</h3>
+                {renderTable(settled, "لا يوجد طلاب سددوا بالكامل بعد.")}
+              </div>
+            </div>
+          );
+        })()
       )}
     </AppShell>
   );
