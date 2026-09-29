@@ -12,6 +12,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
 /** الصفحات المسموح بها لكل نوع مستخدم. */
 export const ROLE_ROUTES: Record<AppRole, string[]> = {
   admin: [
+    "/admin",
     "/dashboard",
     "/students",
     "/groups",
@@ -49,10 +50,27 @@ export function canAccess(role: AppRole, pathname: string) {
   );
 }
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
+export async function fetchMyApproval(): Promise<ApprovalStatus | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) return null;
+  await supabase.rpc("claim_owner_admin" as never);
+  const { data } = await (supabase.from("account_approvals" as never) as any)
+    .select("status").eq("user_id", user.id).maybeSingle();
+  return ((data as { status?: ApprovalStatus } | null)?.status ?? "pending");
+}
+
+export function useMyApproval() {
+  return useQuery({ queryKey: ["my-approval"], queryFn: fetchMyApproval, staleTime: 60 * 1000 });
+}
+
 export async function fetchMyRole(): Promise<AppRole | null> {
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
   if (!user) return null;
+  await supabase.rpc("claim_owner_admin" as never);
 
   const { data } = await supabase
     .from("user_roles")
