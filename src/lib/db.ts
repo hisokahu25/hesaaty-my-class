@@ -35,6 +35,7 @@ export type Payment = {
   month: string;
   amount_due: number;
   amount_paid: number;
+  discount?: number;
   paid_at: string | null;
 };
 

@@ -116,7 +116,7 @@ function StatsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
-        .select("student_id, month, amount_due, amount_paid");
+        .select("student_id, month, amount_due, amount_paid, discount");
       if (error) throw error;
       return data ?? [];
     },
@@ -176,7 +176,7 @@ function StatsPage() {
       p.month >= from.slice(0, 7) &&
       p.month <= to.slice(0, 7),
   );
-  const totalDue = payRows.reduce((s, p) => s + Number(p.amount_due), 0);
+  const totalDue = payRows.reduce((s, p) => s + Number(p.amount_due) - Number(p.discount ?? 0), 0);
   const totalPaid = payRows.reduce((s, p) => s + Number(p.amount_paid), 0);
   const remaining = Math.max(totalDue - totalPaid, 0);
   const byMonth = Object.entries(
@@ -184,7 +184,7 @@ function StatsPage() {
       const cur = acc[p.month] ?? { paid: 0, due: 0 };
       acc[p.month] = {
         paid: cur.paid + Number(p.amount_paid),
-        due: cur.due + Number(p.amount_due),
+        due: cur.due + Number(p.amount_due) - Number(p.discount ?? 0),
       };
       return acc;
     }, {}),
