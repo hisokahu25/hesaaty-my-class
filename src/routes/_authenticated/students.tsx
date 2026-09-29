@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchGroups, fetchStudents, initials, type Student } from "@/lib/db";
+import { useOwnerNames } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/students")({
   head: () => ({
@@ -51,6 +52,7 @@ function StudentsPage() {
   };
 
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
+  const { isAdmin, ownerName } = useOwnerNames();
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
 
   function openNew() {
@@ -255,6 +257,9 @@ function StudentsPage() {
                     {student.grade || "بدون صف"} • {groupName(student.group_id)}
                   </p>
                   <p className="mt-1 font-mono text-xs font-semibold text-primary" dir="ltr">كود الطالب: {student.student_code}</p>
+                  {isAdmin ? (
+                    <p className="mt-1 text-xs text-accent-foreground">أنشأه: {ownerName(student.teacher_id)}</p>
+                  ) : null}
                 </div>
               </div>
               <div className="flex items-center gap-2">

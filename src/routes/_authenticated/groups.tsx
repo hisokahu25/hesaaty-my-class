@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchGroups, fetchStudents, formatMoney, WEEK_DAYS, type Group } from "@/lib/db";
+import { useOwnerNames } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/groups")({
   head: () => ({
@@ -50,6 +51,7 @@ function GroupsPage() {
 
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
+  const { isAdmin, ownerName } = useOwnerNames();
 
   function openNew() {
     setEditingId(null);
@@ -240,6 +242,9 @@ function GroupsPage() {
                     {group.days.join(" • ") || "بدون أيام"} — {group.start_time.slice(0, 5)}
                   </p>
                   <p className="text-xs text-muted-foreground">{group.location || "مكان غير محدد"}</p>
+                  {isAdmin ? (
+                    <p className="mt-1 text-xs text-accent-foreground">أنشأها: {ownerName(group.teacher_id)}</p>
+                  ) : null}
                 </div>
                 <div className="text-left">
                   <span className="text-lg font-semibold text-primary">
