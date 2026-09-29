@@ -518,6 +518,7 @@ export type Database = {
           amount_due: number
           amount_paid: number
           created_at: string
+          discount: number
           id: string
           month: string
           paid_at: string | null
@@ -528,6 +529,7 @@ export type Database = {
           amount_due?: number
           amount_paid?: number
           created_at?: string
+          discount?: number
           id?: string
           month: string
           paid_at?: string | null
@@ -538,6 +540,7 @@ export type Database = {
           amount_due?: number
           amount_paid?: number
           created_at?: string
+          discount?: number
           id?: string
           month?: string
           paid_at?: string | null

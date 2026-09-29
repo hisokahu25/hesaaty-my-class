@@ -51,7 +51,7 @@ function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
-        .select("amount_due, amount_paid, month");
+        .select("amount_due, amount_paid, discount, month");
       if (error) throw error;
       return data ?? [];
     },
@@ -66,15 +66,17 @@ function Dashboard() {
       ? Math.round((present / attendance.data!.length) * 100)
       : 0;
 
+  const netDue = (p: { amount_due: number; discount: number }) =>
+    Number(p.amount_due) - Number(p.discount ?? 0);
   const due = (payments.data ?? []).reduce(
-    (sum, p) => sum + Math.max(Number(p.amount_due) - Number(p.amount_paid), 0),
+    (sum, p) => sum + Math.max(netDue(p) - Number(p.amount_paid), 0),
     0,
   );
   const collected = (payments.data ?? [])
     .filter((p) => p.month === currentMonth())
     .reduce((sum, p) => sum + Number(p.amount_paid), 0);
   const debtors = (payments.data ?? []).filter(
-    (p) => Number(p.amount_due) > Number(p.amount_paid),
+    (p) => netDue(p) > Number(p.amount_paid),
   ).length;
 
   return (
