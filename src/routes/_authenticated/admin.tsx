@@ -57,6 +57,19 @@ function AdminPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const editCreds = useMutation({
+    mutationFn: async ({ id, email, password }: { id: string; email: string; password: string }) => {
+      const { error } = await supabase.rpc("admin_update_user_credentials" as never, {
+        _user_id: id, _email: email || null, _password: password || null,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("تم تحديث بيانات الدخول");
+      qc.invalidateQueries({ queryKey: ["account-approvals"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const rows = list.data ?? [];
   const count = (s: ApprovalStatus) => rows.filter((r) => r.status === s).length;
 
@@ -90,6 +103,22 @@ function AdminPage() {
                     {r.status === "approved" ? "إيقاف" : "رفض"}
                   </Button>
                 ) : null}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={editCreds.isPending}
+                  onClick={() => {
+                    const email = prompt(`البريد الجديد (اتركه فارغًا لعدم التغيير):`, r.email);
+                    if (email === null) return;
+                    const password = prompt("كلمة المرور الجديدة (6 أحرف على الأقل، اتركها فارغة لعدم التغيير):", "");
+                    if (password === null) return;
+                    const e = email.trim() === r.email ? "" : email.trim();
+                    if (!e && !password) return;
+                    editCreds.mutate({ id: r.user_id, email: e, password });
+                  }}
+                >
+                  تعديل البريد/كلمة المرور
+                </Button>
                 <Button
                   size="sm"
                   variant="destructive"
