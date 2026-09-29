@@ -94,3 +94,23 @@ export function useMyRole() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+/** للمدير فقط: خريطة معرف المدرس/المركز -> اسمه (أو بريده). */
+export function useOwnerNames() {
+  const role = useMyRole();
+  const isAdmin = role.data === "admin";
+  const q = useQuery({
+    queryKey: ["owner-names"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data } = await (supabase.from("account_approvals" as never) as any)
+        .select("user_id, email, full_name");
+      const map: Record<string, string> = {};
+      for (const r of (data ?? []) as { user_id: string; email: string; full_name: string }[]) {
+        map[r.user_id] = r.full_name || r.email;
+      }
+      return map;
+    },
+  });
+  return { isAdmin, ownerName: (id: string) => q.data?.[id] ?? "غير معروف" };
+}
