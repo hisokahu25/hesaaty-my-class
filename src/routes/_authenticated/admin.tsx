@@ -64,7 +64,7 @@ function AdminPage() {
     setBusy(true);
     const { data, error } = await supabase.rpc("admin_export_user_data" as never, { _user_id: r.user_id } as never);
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -82,12 +82,12 @@ function AdminPage() {
       const file = input.files?.[0];
       if (!file) return;
       let parsed: unknown;
-      try { parsed = JSON.parse(await file.text()); } catch { return toast.error("الملف غير صالح"); }
+      try { parsed = JSON.parse(await file.text()); } catch { { toast.error("الملف غير صالح"); return; } }
       if (!confirm(`استيراد البيانات إلى حساب ${r.email}؟ البيانات الموجودة لن تُحذف.`)) return;
       setBusy(true);
       const { error } = await supabase.rpc("admin_import_user_data" as never, { _user_id: r.user_id, _data: parsed } as never);
       setBusy(false);
-      if (error) return toast.error(error.message);
+      if (error) { toast.error(error.message); return; }
       toast.success("تم استيراد البيانات");
     };
     input.click();
@@ -98,7 +98,7 @@ function AdminPage() {
     setBusy(true);
     const { error } = await supabase.rpc("admin_wipe_user_data" as never, { _user_id: r.user_id } as never);
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("تم مسح البيانات");
   }
 
