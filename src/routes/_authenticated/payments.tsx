@@ -239,8 +239,35 @@ function PaymentsPage() {
   );
   const totalPaid = (payments.data ?? []).reduce((sum, p) => sum + Number(p.amount_paid), 0);
 
+  function unpaidMonthsFor(id: string): string[] {
+    const student = students.data?.find((s) => s.id === id) as { created_at?: string } | undefined;
+    const start = (student?.created_at ?? new Date().toISOString()).slice(0, 7);
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const end = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    const paid = new Map<string, number>();
+    const due = new Map<string, number>();
+    for (const p of payments.data ?? []) {
+      if (p.student_id !== id) continue;
+      paid.set(p.month, (paid.get(p.month) ?? 0) + Number(p.amount_paid) + Number(p.discount ?? 0));
+      due.set(p.month, Math.max(due.get(p.month) ?? 0, Number(p.amount_due)));
+    }
+    const out: string[] = [];
+    let [y, m] = start.split("-").map(Number) as [number, number];
+    for (let i = 0; i < 60; i++) {
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      if (key > end) break;
+      if (!due.has(key) || (paid.get(key) ?? 0) < (due.get(key) ?? 0)) out.push(key);
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return out;
+  }
+  const unpaidMonths = studentId ? unpaidMonthsFor(studentId) : [];
+
   function pickStudent(id: string) {
     setStudentId(id);
+    const months = id ? unpaidMonthsFor(id) : [];
+    if (months.length) setMonth(months[0]!);
     const student = students.data?.find((s) => s.id === id);
     const group = groups.data?.find((g) => g.id === student?.group_id);
     if (group) {
@@ -422,7 +449,22 @@ function PaymentsPage() {
                 )}
                 <div className="space-y-2">
                   <Label>شهر الاشتراك</Label>
-                  <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+                  {studentId && !editId && unpaidMonths.length > 0 ? (
+                    <select
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      {unpaidMonths.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+                  )}
+                  {studentId && !editId ? (
+                    <p className="text-xs text-muted-foreground">تظهر الشهور التي لم يتم سدادها بالكامل للطالب فقط.</p>
+                  ) : null}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2">

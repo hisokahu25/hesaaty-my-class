@@ -752,10 +752,16 @@ export type Database = {
     }
     Functions: {
       admin_delete_user: { Args: { _user_id: string }; Returns: undefined }
+      admin_export_user_data: { Args: { _user_id: string }; Returns: Json }
+      admin_import_user_data: {
+        Args: { _data: Json; _user_id: string }
+        Returns: undefined
+      }
       admin_update_user_credentials: {
         Args: { _email?: string; _password?: string; _user_id: string }
         Returns: undefined
       }
+      admin_wipe_user_data: { Args: { _user_id: string }; Returns: undefined }
       authenticate_student_portal: {
         Args: { _password: string; _student_code: string }
         Returns: string
