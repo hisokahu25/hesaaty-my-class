@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, EmptyState, SectionTitle, StatCard } from "@/components/AppShell";
@@ -57,6 +58,50 @@ function AdminPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const [busy, setBusy] = useState(false);
+
+  async function exportData(r: Row) {
+    setBusy(true);
+    const { data, error } = await supabase.rpc("admin_export_user_data" as never, { _user_id: r.user_id } as never);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `hesaty-${(r.email || r.user_id).replace(/[^a-z0-9@._-]/gi, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success("تم تصدير البيانات");
+  }
+
+  function importData(r: Row) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      let parsed: unknown;
+      try { parsed = JSON.parse(await file.text()); } catch { return toast.error("الملف غير صالح"); }
+      if (!confirm(`استيراد البيانات إلى حساب ${r.email}؟ البيانات الموجودة لن تُحذف.`)) return;
+      setBusy(true);
+      const { error } = await supabase.rpc("admin_import_user_data" as never, { _user_id: r.user_id, _data: parsed } as never);
+      setBusy(false);
+      if (error) return toast.error(error.message);
+      toast.success("تم استيراد البيانات");
+    };
+    input.click();
+  }
+
+  async function wipeData(r: Row) {
+    if (!confirm(`مسح كل بيانات ${r.email} (الطلاب والمجموعات والدفعات والاختبارات...) مع إبقاء الحساب؟ ننصح بتصدير البيانات أولًا. لا يمكن التراجع.`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("admin_wipe_user_data" as never, { _user_id: r.user_id } as never);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("تم مسح البيانات");
+  }
+
   const editCreds = useMutation({
     mutationFn: async ({ id, email, password }: { id: string; email: string; password: string }) => {
       const { error } = await supabase.rpc("admin_update_user_credentials" as never, {
@@ -118,6 +163,21 @@ function AdminPage() {
                   }}
                 >
                   تعديل البريد/كلمة المرور
+                </Button>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => exportData(r)}>
+                  تصدير البيانات
+                </Button>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => importData(r)}>
+                  استيراد البيانات
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive"
+                  disabled={busy}
+                  onClick={() => wipeData(r)}
+                >
+                  مسح البيانات
                 </Button>
                 <Button
                   size="sm"
