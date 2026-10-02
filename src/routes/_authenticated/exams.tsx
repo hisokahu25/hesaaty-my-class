@@ -17,6 +17,7 @@ import { fetchGroups, fetchStudents } from "@/lib/db";
 
 type ExamKind = "online" | "essay";
 type Question = { type: "mcq" | "true_false" | "essay"; prompt: string; points: string; options: string[]; correct: string };
+const IMAGE_PROMPT = "أجب على أسئلة ورقة الاختبار المرفقة";
 const blankQuestion = (kind: ExamKind): Question => ({
   type: kind === "essay" ? "essay" : "mcq",
   prompt: "",
@@ -59,7 +60,10 @@ function ExamsPage() {
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [questions, setQuestions] = useState<Question[]>([blankQuestion("online")]);
+  const formQuestions = questions;
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageOnly, setImageOnly] = useState(false);
+  const [imageScore, setImageScore] = useState("10");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [editExamId, setEditExamId] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
@@ -147,7 +151,10 @@ function ExamsPage() {
         correct: (Array.isArray(q.exam_answer_keys) ? q.exam_answer_keys[0]?.correct_answer : (q.exam_answer_keys as { correct_answer: string } | null)?.correct_answer) ?? "0",
       };
     });
-    setQuestions(loaded.length ? loaded : [blankQuestion(examKind)]);
+    const single = loaded.length === 1 && loaded[0]!.type === "essay" && loaded[0]!.prompt === IMAGE_PROMPT;
+    setImageOnly(single);
+    if (single) setImageScore(loaded[0]!.points);
+    setQuestions(single || !loaded.length ? [blankQuestion(examKind)] : loaded);
   }, [editExamId, editing.data]);
 
   const saveExam = useMutation({
@@ -156,6 +163,13 @@ function ExamsPage() {
       if (!auth.user) throw new Error("انتهت الجلسة");
       if (!title.trim()) throw new Error("أكمل اسم الاختبار");
       if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) throw new Error("النهاية يجب أن تكون بعد البداية");
+      const hasImage = Boolean(imageFile || existingImageUrl);
+      const useImageOnly = imageOnly && hasImage;
+      if (imageOnly && !hasImage) throw new Error("ارفع صورة الاختبار أولًا");
+      if (useImageOnly && !(Number(imageScore) > 0)) throw new Error("أدخل الدرجة النهائية للاختبار");
+      const questions: Question[] = useImageOnly
+        ? [{ type: "essay", prompt: IMAGE_PROMPT, points: imageScore, options: [], correct: "" }]
+        : formQuestions;
       if (!questions.length || questions.some((q) => !q.prompt.trim())) throw new Error("أكمل نصوص الأسئلة");
       if (!groupIds.length && !studentIds.length) throw new Error("اختر مجموعة أو طالبًا واحدًا على الأقل");
       let imagePath: string | null = existingImageUrl;
@@ -165,7 +179,7 @@ function ExamsPage() {
         const { error: upErr } = await supabase.storage.from("exam-images").upload(imagePath, imageFile, { contentType: imageFile.type });
         if (upErr) throw upErr;
       }
-      const total = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+      const total = questions.reduce((sum, q) => sum + (q.type === "essay" ? (Number(q.points) || 0) : 1), 0);
       const examPayload = {
         title: title.trim(), instructions: instructions.trim(),
         max_score: total, exam_date: (startsAt || new Date().toISOString()).slice(0, 10), starts_at: startsAt ? new Date(startsAt).toISOString() : null,
@@ -174,7 +188,7 @@ function ExamsPage() {
       const writeQuestions = async (examId: string) => {
         const { data: insertedQuestions, error: questionError } = await supabase.from("exam_questions").insert(
           questions.map((q, index) => ({ exam_id: examId, teacher_id: auth.user!.id, question_type: q.type,
-            prompt: q.prompt.trim(), points: Number(q.points) || 1, position: index,
+            prompt: q.prompt.trim(), points: q.type === "essay" ? (Number(q.points) || 1) : 1, position: index,
             options: q.type === "true_false" ? ["صح", "خطأ"] : q.options.filter(Boolean) })),
         ).select("id,position");
         if (questionError) throw questionError;
@@ -212,7 +226,7 @@ function ExamsPage() {
         return;
       }
       const { data: exam, error } = await supabase.from("exams").insert({
-        teacher_id: auth.user.id, kind, publish_status: "draft", ...examPayload,
+        teacher_id: auth.user.id, kind: useImageOnly ? "essay" : kind, publish_status: "draft", ...examPayload,
       }).select("id").single();
       if (error) throw error;
       await writeQuestions(exam.id);
@@ -276,13 +290,13 @@ function ExamsPage() {
     setExistingImageUrl(null);
     setImageFile(null);
     setTitle(""); setInstructions(""); setStartsAt(""); setEndsAt("");
-    setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion(kind)]);
+    setImageOnly(false); setImageScore("10"); setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion(kind)]);
   }
   function openCreate() { closeDialog(); setOpen(true); }
   function openEdit(id: string) {
     setEditExamId(id); setExistingImageUrl(null); setImageFile(null);
     setTitle(""); setInstructions(""); setStartsAt(""); setEndsAt("");
-    setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion("online")]);
+    setImageOnly(false); setImageScore("10"); setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion("online")]);
     setOpen(true);
   }
   function changeKind(next: ExamKind) { setKind(next); setQuestions([blankQuestion(next)]); }
@@ -326,7 +340,8 @@ function ExamsPage() {
         <Field label="تعليمات الاختبار"><Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} maxLength={1000} /></Field>
         <div className="grid grid-cols-2 gap-3"><Field label="بداية الاختبار (اختياري)"><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></Field><Field label="نهاية الاختبار (اختياري)"><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></Field></div>
         <div className="grid gap-4 sm:grid-cols-2"><Selection title="تعيين لمجموعات" items={(groups.data ?? []).map((g) => ({ id: g.id, label: g.name }))} selected={groupIds} onToggle={(id) => toggle(groupIds, id, setGroupIds)} /><Selection title="تعيين لطلاب محددين" items={(students.data ?? []).map((s) => ({ id: s.id, label: s.full_name }))} selected={studentIds} onToggle={(id) => toggle(studentIds, id, setStudentIds)} /></div>
-        <div className="space-y-3"><div className="flex items-center justify-between"><Label>الأسئلة</Label><Button size="sm" variant="outline" onClick={() => setQuestions((q) => [...q, blankQuestion(kind)])}><Plus className="size-4" />سؤال</Button></div>{questions.map((q, index) => <div key={index} className="space-y-3 rounded-lg bg-secondary p-3"><div className="flex gap-2"><Input value={q.prompt} onChange={(e) => updateQuestion(index, { prompt: e.target.value })} placeholder={`السؤال ${index + 1}`} /><Input className="w-20" type="number" min={1} value={q.points} onChange={(e) => updateQuestion(index, { points: e.target.value })} /><Button size="icon" variant="ghost" className="size-10 shrink-0 text-destructive" aria-label={`حذف السؤال ${index + 1}`} onClick={() => removeQuestion(index)}>×</Button></div>{kind === "online" ? <><select value={q.type} onChange={(e) => updateQuestion(index, { type: e.target.value as Question["type"], options: e.target.value === "true_false" ? ["صح", "خطأ"] : ["", "", "", ""], correct: "0" })} className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"><option value="mcq">اختيار من متعدد</option><option value="true_false">صح أو خطأ</option></select><div className="grid grid-cols-2 gap-2">{q.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-center gap-2"><input type="radio" name={`correct-${editExamId ?? "new"}-${index}`} checked={q.correct === String(optionIndex)} onChange={() => updateQuestion(index, { correct: String(optionIndex) })} /><Input value={option} disabled={q.type === "true_false"} onChange={(e) => updateQuestion(index, { options: q.options.map((item, i) => i === optionIndex ? e.target.value : item) })} placeholder={`اختيار ${optionIndex + 1}`} /></label>)}</div></> : <p className="text-xs text-muted-foreground">سيظهر للطالب حقل كتابة، وتُراجع الإجابة يدويًا.</p>}</div>)}</div>
+        {(imageFile || existingImageUrl) ? <div className="space-y-3 rounded-lg bg-secondary p-3"><label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={imageOnly} onChange={(e) => setImageOnly(e.target.checked)} />الاختبار بالصورة فقط (بدون كتابة أسئلة)</label>{imageOnly ? <Field label="الدرجة النهائية للاختبار"><Input type="number" min={1} value={imageScore} onChange={(e) => setImageScore(e.target.value)} /></Field> : null}{imageOnly ? <p className="text-xs text-muted-foreground">سيكتب الطالب إجاباته في خانة واحدة، وتضع أنت الدرجة يدويًا عند التصحيح.</p> : null}</div> : null}
+        {!(imageOnly && (imageFile || existingImageUrl)) ? <div className="space-y-3"><div className="flex items-center justify-between"><Label>الأسئلة</Label><Button size="sm" variant="outline" onClick={() => setQuestions((q) => [...q, blankQuestion(kind)])}><Plus className="size-4" />سؤال</Button></div>{questions.map((q, index) => <div key={index} className="space-y-3 rounded-lg bg-secondary p-3"><div className="flex gap-2"><Input value={q.prompt} onChange={(e) => updateQuestion(index, { prompt: e.target.value })} placeholder={`السؤال ${index + 1}`} />{q.type === "essay" ? <Input className="w-20" type="number" min={1} title="درجة السؤال" value={q.points} onChange={(e) => updateQuestion(index, { points: e.target.value })} /> : <span className="flex h-10 w-20 shrink-0 items-center justify-center rounded-md bg-card text-xs text-muted-foreground ring-1 ring-border">1 درجة</span>}<Button size="icon" variant="ghost" className="size-10 shrink-0 text-destructive" aria-label={`حذف السؤال ${index + 1}`} onClick={() => removeQuestion(index)}>×</Button></div>{kind === "online" ? <><select value={q.type} onChange={(e) => updateQuestion(index, { type: e.target.value as Question["type"], options: e.target.value === "true_false" ? ["صح", "خطأ"] : ["", "", "", ""], correct: "0" })} className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"><option value="mcq">اختيار من متعدد</option><option value="true_false">صح أو خطأ</option></select><div className="grid grid-cols-2 gap-2">{q.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-center gap-2"><input type="radio" name={`correct-${editExamId ?? "new"}-${index}`} checked={q.correct === String(optionIndex)} onChange={() => updateQuestion(index, { correct: String(optionIndex) })} /><Input value={option} disabled={q.type === "true_false"} onChange={(e) => updateQuestion(index, { options: q.options.map((item, i) => i === optionIndex ? e.target.value : item) })} placeholder={`اختيار ${optionIndex + 1}`} /></label>)}</div></> : <p className="text-xs text-muted-foreground">سيظهر للطالب حقل كتابة، وتُراجع الإجابة يدويًا.</p>}</div>)}</div> : null}
         <Button className="w-full" disabled={saveExam.isPending} onClick={() => saveExam.mutate()}>{saveExam.isPending ? "جارٍ الحفظ..." : editExamId ? "حفظ التعديلات" : "حفظ كمسودة"}</Button>
       </div></DialogContent></Dialog>
 
