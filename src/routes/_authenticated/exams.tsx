@@ -60,6 +60,7 @@ function ExamsPage() {
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [questions, setQuestions] = useState<Question[]>([blankQuestion("online")]);
+  const formQuestions = questions;
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageOnly, setImageOnly] = useState(false);
   const [imageScore, setImageScore] = useState("10");
@@ -289,13 +290,13 @@ function ExamsPage() {
     setExistingImageUrl(null);
     setImageFile(null);
     setTitle(""); setInstructions(""); setStartsAt(""); setEndsAt("");
-    setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion(kind)]);
+    setImageOnly(false); setImageScore("10"); setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion(kind)]);
   }
   function openCreate() { closeDialog(); setOpen(true); }
   function openEdit(id: string) {
     setEditExamId(id); setExistingImageUrl(null); setImageFile(null);
     setTitle(""); setInstructions(""); setStartsAt(""); setEndsAt("");
-    setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion("online")]);
+    setImageOnly(false); setImageScore("10"); setGroupIds([]); setStudentIds([]); setQuestions([blankQuestion("online")]);
     setOpen(true);
   }
   function changeKind(next: ExamKind) { setKind(next); setQuestions([blankQuestion(next)]); }
