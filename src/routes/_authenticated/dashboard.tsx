@@ -73,6 +73,12 @@ function Dashboard() {
     },
   });
 
+  const monthRows = monthAttendance.data ?? [];
+  const monthPresent = monthRows.filter((a) => a.status !== "absent").length;
+  const monthAbsentRows = monthRows.filter((a) => a.status === "absent");
+  const studentName = (id: string) =>
+    (students.data ?? []).find((s) => s.id === id)?.full_name ?? "طالب";
+
   const studentCount = students.data?.length ?? 0;
   const todayGroups = (groups.data ?? []).filter((g) => g.days.includes(todayName()));
   const present = (attendance.data ?? []).filter((a) => a.status !== "absent").length;
@@ -121,6 +127,41 @@ function Dashboard() {
           hint="مجموعات اليوم"
         />
       </section>
+
+      <section className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="حضور الشهر"
+          value={formatMoney(monthPresent)}
+          hint="تسجيل حضور وتأخير"
+          tone="success"
+        />
+        <button type="button" onClick={() => setShowAbsences((v) => !v)} className="text-start">
+          <StatCard
+            label="غياب الشهر"
+            value={formatMoney(monthAbsentRows.length)}
+            hint={showAbsences ? "اضغط لإخفاء القائمة" : "اضغط لعرض الغائبين"}
+            tone="destructive"
+          />
+        </button>
+      </section>
+
+      {showAbsences ? (
+        <section className="space-y-3">
+          <SectionTitle title="غائبو هذا الشهر" aside={currentMonth()} />
+          {monthAbsentRows.length === 0 ? (
+            <EmptyState text="لا يوجد غياب مسجل هذا الشهر." />
+          ) : (
+            <div className="divide-y divide-border rounded-xl bg-card ring-1 ring-border">
+              {monthAbsentRows.map((row, i) => (
+                <div key={`${row.student_id}-${row.session_date}-${i}`} className="flex items-center justify-between p-3">
+                  <p className="text-sm font-medium">{studentName(row.student_id)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateAr(row.session_date)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className="space-y-4">
         <SectionTitle title="حصص اليوم" aside={formatDateAr(todayISO())} />
