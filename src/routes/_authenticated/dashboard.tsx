@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, EmptyState, SectionTitle, StatCard } from "@/components/AppShell";
 import {
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
+  const [showAbsences, setShowAbsences] = useState(false);
   const students = useQuery({ queryKey: ["students"], queryFn: fetchStudents });
   const groups = useQuery({ queryKey: ["groups"], queryFn: fetchGroups });
 
@@ -41,6 +43,20 @@ function Dashboard() {
         .from("attendance")
         .select("status")
         .eq("session_date", todayISO());
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const monthAttendance = useQuery({
+    queryKey: ["attendance-month", currentMonth()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("student_id, status, session_date")
+        .gte("session_date", `${currentMonth()}-01`)
+        .lte("session_date", `${currentMonth()}-31`)
+        .order("session_date", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
