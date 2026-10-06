@@ -263,6 +263,7 @@ function PaymentsPage() {
     return out;
   }
   const unpaidMonths = studentId ? unpaidMonthsFor(studentId) : [];
+  const pastDueOf = (id: string) => unpaidMonthsFor(id).filter((m) => m < currentMonth());
 
   function pickStudent(id: string) {
     setStudentId(id);
@@ -401,7 +402,7 @@ function PaymentsPage() {
                       <option value="">اختر الطالب</option>
                       {(students.data ?? []).map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.full_name}
+                          {s.full_name}{pastDueOf(s.id).length ? " ⚠ عليه شهور سابقة" : ""}
                         </option>
                       ))}
                     </select>
@@ -433,13 +434,16 @@ function PaymentsPage() {
                           <p className="text-xs text-muted-foreground">لا يوجد طلاب</p>
                         ) : (
                           (students.data ?? []).map((s) => (
-                            <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-secondary">
+                            <label key={s.id} className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-secondary ${pastDueOf(s.id).length ? "bg-destructive/10 text-destructive" : ""}`}>
                               <input
                                 type="checkbox"
                                 checked={selectedIds.includes(s.id)}
                                 onChange={() => toggleStudent(s.id)}
                               />
                               {s.full_name}
+                              {pastDueOf(s.id).length ? (
+                                <span className="ms-auto text-xs">عليه {pastDueOf(s.id).length} شهر سابق + الحالي</span>
+                              ) : null}
                             </label>
                           ))
                         )}
@@ -449,14 +453,21 @@ function PaymentsPage() {
                 )}
                 <div className="space-y-2">
                   <Label>شهر الاشتراك</Label>
+                  {studentId && !editId && pastDueOf(studentId).length > 0 ? (
+                    <div className="rounded-md bg-destructive/10 p-2 text-xs font-medium text-destructive ring-1 ring-destructive/30">
+                      على الطالب شهور سابقة لم تُسدد: {pastDueOf(studentId).join("، ")} — اختر الشهر الذي تريد سداده.
+                    </div>
+                  ) : null}
                   {studentId && !editId && unpaidMonths.length > 0 ? (
                     <select
                       value={month}
                       onChange={(e) => setMonth(e.target.value)}
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      className={`h-10 w-full rounded-md border bg-background px-3 text-sm ${month < currentMonth() ? "border-destructive text-destructive" : "border-input"}`}
                     >
                       {unpaidMonths.map((m) => (
-                        <option key={m} value={m}>{m}</option>
+                        <option key={m} value={m}>
+                          {m} {m < currentMonth() ? "(شهر سابق متأخر)" : m === currentMonth() ? "(الشهر الحالي)" : "(الشهر القادم)"}
+                        </option>
                       ))}
                     </select>
                   ) : (
